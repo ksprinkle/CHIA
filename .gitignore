@@ -1,0 +1,25 @@
+.venv/
+__pycache__/
+*.pyc
+
+# Local databases and generated data
+*.sqlite
+*.sqlite3
+*.db
+
+# Raw source data
+Data/Raw/
+
+# Generated/processed analytical artifacts
+Data/Processed/
+Data/Outputs/
+
+# Local/editor files
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Environment/secrets
+.env
+.env.*
+!.env.example
