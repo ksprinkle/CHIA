@@ -6,7 +6,9 @@ from fastapi import APIRouter
 
 from app.config import API_V1_PREFIX
 from app.api.v1.counties import router as counties_router
+from app.api.v1.explorer import router as explorer_router
 
 
 api_v1_router = APIRouter(prefix=API_V1_PREFIX)
 api_v1_router.include_router(counties_router)
+api_v1_router.include_router(explorer_router)
