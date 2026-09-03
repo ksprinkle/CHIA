@@ -1,0 +1,11 @@
+# CHIA County Explorer -- runtime / test dependencies.
+#
+# The CE-A00..A06 analytical pipeline uses only the Python standard library
+# (plus numpy / pandas, already present in the environment, for the ETL build
+# scripts under Data/Model/). The dependencies below were authorized for the
+# CE-B01 County API slice.
+
+fastapi==0.141.1
+pydantic==2.13.5
+uvicorn==0.52.4
+httpx==0.28.1
