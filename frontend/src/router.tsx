@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react'
+import type { RouteObject } from 'react-router-dom'
 import { createBrowserRouter } from 'react-router-dom'
 
-import { NotFound } from './components/NotFound'
 import { Layout } from './components/Layout'
-import { CountyRoutePlaceholder } from './pages/CountyRoutePlaceholder'
+import { NotFound } from './components/NotFound'
+import { CountyPage } from './pages/CountyPage'
 import { HomePage } from './pages/HomePage'
 
 function withLayout(children: ReactNode): ReactNode {
@@ -11,15 +12,19 @@ function withLayout(children: ReactNode): ReactNode {
 }
 
 /**
- * CE-C01 base route table. `/` is the no-county initial state; the county route
- * exists so a county is addressable by FIPS in the URL. Route *behaviour*
- * (selection, URL-state sync, profile rendering) is CE-C02 / CE-C03.
+ * Route table. `/` is the no-county initial state; `/counties/:countyFips` is
+ * the county route (selection acknowledgement in CE-C02; profile in CE-C03).
+ * Exported so tests can build a deterministic `createMemoryRouter`.
  */
-export const router = createBrowserRouter([
+export const routes: RouteObject[] = [
   { path: '/', element: withLayout(<HomePage />) },
-  { path: '/counties/:countyFips', element: withLayout(<CountyRoutePlaceholder />) },
+  { path: '/counties/:countyFips', element: withLayout(<CountyPage />) },
   {
     path: '*',
-    element: withLayout(<NotFound title="Page not found" message="This page could not be found." />),
+    element: withLayout(
+      <NotFound title="Page not found" message="This page could not be found." />,
+    ),
   },
-])
+]
+
+export const router = createBrowserRouter(routes)

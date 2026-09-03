@@ -1,7 +1,12 @@
 import { RouterProvider } from 'react-router-dom'
 
+import { CountyDirectoryProvider } from './lib/countyDirectory'
 import { router } from './router'
 
 export function App() {
-  return <RouterProvider router={router} />
+  return (
+    <CountyDirectoryProvider>
+      <RouterProvider router={router} />
+    </CountyDirectoryProvider>
+  )
 }

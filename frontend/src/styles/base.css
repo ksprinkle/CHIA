@@ -162,8 +162,52 @@ code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+/* CE-C02 county selection region */
+.app-county-nav {
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-3);
+}
+
+.county-selector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 24rem;
+}
+
+.county-selector__label {
+  font-weight: 600;
+}
+
+.county-selector__control {
+  font: inherit;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: inherit;
+}
+
+.county-selector__empty {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.county-page__fips {
+  color: var(--color-muted);
+  font-weight: 400;
+}
+
+.county-page__back {
+  margin-top: var(--space-3);
+}
+
 @media (max-width: 600px) {
   .app-main {
     padding: var(--space-4) var(--space-2);
+  }
+
+  .county-selector {
+    max-width: none;
   }
 }
