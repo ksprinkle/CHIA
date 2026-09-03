@@ -23,3 +23,10 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# Frontend (Node / Vite) build artifacts
+node_modules/
+frontend/dist/
+frontend/coverage/
+.vite/
+*.local

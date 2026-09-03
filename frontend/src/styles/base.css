@@ -1,0 +1,169 @@
+/*
+ * CE-C01 minimal, neutral, accessible visual foundation.
+ * No design system, no brand: just a reset, neutral tokens, visible focus,
+ * reduced-motion support, and a responsive content container. Later slices
+ * compose on top of these primitives.
+ */
+
+:root {
+  color-scheme: light;
+
+  --color-bg: #ffffff;
+  --color-fg: #1a1a1a;
+  --color-muted: #545454;
+  --color-border: #cfcfcf;
+  --color-surface: #f4f4f4;
+  --color-focus: #10428a;
+  --color-error-border: #8a1c1c;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 40px;
+
+  --radius: 6px;
+  --content-max: 960px;
+
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  line-height: 1.5;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  -webkit-text-size-adjust: 100%;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 10;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-fg);
+  color: var(--color-bg);
+}
+
+.skip-link:focus {
+  left: var(--space-2);
+  top: var(--space-2);
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-3);
+}
+
+.app-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.app-main {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-3);
+}
+
+.app-main:focus {
+  outline: none;
+}
+
+.home__hint,
+.state__message {
+  color: var(--color-muted);
+}
+
+.state {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  padding: var(--space-4);
+}
+
+.state--error {
+  border-color: var(--color-error-border);
+}
+
+.state__title {
+  margin-top: 0;
+}
+
+.state__spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-right: var(--space-2);
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-focus);
+  border-radius: 50%;
+  vertical-align: -0.15em;
+  animation: chia-spin 0.8s linear infinite;
+}
+
+@keyframes chia-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.button {
+  font: inherit;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: inherit;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--color-surface);
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@media (max-width: 600px) {
+  .app-main {
+    padding: var(--space-4) var(--space-2);
+  }
+}
