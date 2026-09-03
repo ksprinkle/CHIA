@@ -1,0 +1,71 @@
+# Community Health Intelligence Atlas (CHIA)
+
+# Data Sources
+
+## Purpose
+
+This document catalogs every dataset used by CHIA, including its source, purpose, geographic level, update frequency, and intended use.
+
+---
+
+# Primary Data Sources
+
+| Source                          | Organization       | Geography                  | Purpose                                        | Status  |
+| ------------------------------- | ------------------ | -------------------------- | ---------------------------------------------- | ------- |
+| CDC PLACES                      | CDC                | County, Census Tract, ZCTA | Chronic disease prevalence and health measures | Planned |
+| CDC WONDER                      | CDC                | County                     | Mortality and causes of death                  | Planned |
+| American Community Survey (ACS) | U.S. Census Bureau | County                     | Demographics and socioeconomic indicators      | Planned |
+| Decennial Census                | U.S. Census Bureau | County                     | Population reference data                      | Planned |
+| HRSA Data Warehouse             | HRSA               | County                     | Healthcare access and provider shortages       | Planned |
+| CMS Provider Data               | CMS                | County                     | Healthcare provider availability               | Planned |
+| USDA Food Access Research Atlas | USDA               | County/Census Tract        | Food access and nutrition                      | Planned |
+| EPA Environmental Data          | EPA                | County                     | Environmental quality indicators               | Future  |
+| NOAA Climate Data               | NOAA               | County                     | Climate and weather indicators                 | Future  |
+| USGS Geographic Data            | USGS               | County                     | Geographic reference data                      | Future  |
+
+---
+
+# Data Requirements
+
+Each dataset should include:
+
+* Official source
+* Publication date
+* Version
+* Download location
+* License or terms of use
+* Geographic coverage
+* Update frequency
+* Data quality notes
+
+---
+
+# Source Selection Criteria
+
+CHIA will prioritize:
+
+1. Official government sources
+2. Peer-reviewed public datasets
+3. National coverage
+4. Regularly updated datasets
+5. Transparent methodologies
+
+---
+
+# Version 1 Core Datasets
+
+Version 1 requires only:
+
+* CDC PLACES
+* CDC WONDER
+* American Community Survey
+* Decennial Census
+* HRSA
+
+All other datasets are optional future enhancements.
+
+---
+
+# Data Governance
+
+Every dataset used in CHIA must be documented, versioned, and traceable to its original source. No undocumented or proprietary datasets will be included in Version 1.

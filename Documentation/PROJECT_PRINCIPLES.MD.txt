@@ -1,0 +1,118 @@
+# Community Health Intelligence Atlas (CHIA)
+
+## Project Principles
+
+### Purpose
+
+These principles define how CHIA will be designed, developed, and maintained. They are intended to keep the project focused, transparent, scientifically responsible, and manageable over time.
+
+---
+
+## Principle 1 — Use Authoritative Public Data
+
+CHIA will rely on authoritative, publicly available datasets whenever possible. Preference will be given to federal, state, and peer-reviewed sources.
+
+Examples include:
+
+* CDC PLACES
+* CDC WONDER
+* U.S. Census Bureau
+* American Community Survey (ACS)
+* HRSA
+* CMS
+* USDA
+* EPA
+* NOAA
+* USGS
+
+---
+
+## Principle 2 — Transparency Above Complexity
+
+Every score, calculation, ranking, and classification must be understandable.
+
+A simpler method that is fully explainable is preferred over a more complex model that cannot be easily interpreted.
+
+---
+
+## Principle 3 — Reproducibility
+
+Another researcher should be able to reproduce every result using the same public data and documented methodology.
+
+No "black box" calculations should exist within Version 1.
+
+---
+
+## Principle 4 — Correlation Is Not Causation
+
+CHIA identifies patterns and associations.
+
+Unless supported by high-quality scientific evidence, the project will never present correlations as proof of causation.
+
+The purpose of CHIA is to generate insight—not to establish causal relationships.
+
+---
+
+## Principle 5 — Community-Level Analysis Only
+
+CHIA evaluates communities—not individuals.
+
+The project is intended for research, education, planning, and public-health exploration.
+
+It is not intended for medical diagnosis, prediction of individual outcomes, or clinical decision-making.
+
+---
+
+## Principle 6 — Simplicity Is a Feature
+
+Every new feature must provide meaningful analytical value.
+
+Features that add complexity without improving understanding should be excluded.
+
+The project should remain approachable for researchers, students, and interested users.
+
+---
+
+## Principle 7 — Offline First
+
+Version 1 is designed to operate completely offline after the required datasets have been obtained.
+
+The project should not require:
+
+* cloud hosting
+* databases
+* user accounts
+* subscriptions
+* ongoing infrastructure
+
+---
+
+## Principle 8 — Evidence Before Opinion
+
+Whenever conclusions are presented, they should be supported by documented evidence.
+
+When uncertainty exists, the uncertainty should be acknowledged rather than hidden.
+
+---
+
+## Principle 9 — Finish Before Expanding
+
+CHIA Version 1 should become a complete, polished research tool before additional capabilities are added.
+
+Future enhancements should build upon a stable foundation rather than continually redefining it.
+
+---
+
+## Principle 10 — Practical Value
+
+Every component of CHIA should help answer at least one meaningful question.
+
+If a feature does not improve understanding or support better decisions, it does not belong in the project.
+
+---
+
+# Guiding Philosophy
+
+CHIA exists to improve understanding of community health by organizing reliable public information into a transparent, explainable, and practical research tool.
+
+Its purpose is not merely to identify where health burdens exist, but to help explore the characteristics, patterns, and relationships that consistently accompany them while maintaining scientific integrity and methodological transparency.

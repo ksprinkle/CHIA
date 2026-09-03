@@ -1,0 +1,129 @@
+# Community Health Intelligence Atlas (CHIA)
+
+# Project Log
+
+---
+
+# Version 0.1.0 — Project Foundation
+
+**Date:** August 28, 2026
+
+## Project Established
+
+The Community Health Intelligence Atlas (CHIA) project was created to explore geographic patterns of health burden across the United States using authoritative public datasets.
+
+The project began after reviewing CDC research showing that chronic diseases frequently cluster geographically and are closely associated with socioeconomic and healthcare-access factors. Rather than focusing on a single disease, the project's objective became understanding the combination of characteristics associated with overall community health burden.
+
+---
+
+## Major Decisions
+
+### Project Scope
+
+Version 1 will focus exclusively on the United States.
+
+The initial geographic unit of analysis will be counties, with the potential to incorporate ZIP Code Tabulation Areas or census tracts in future versions if doing so materially improves the analysis.
+
+---
+
+### Project Purpose
+
+CHIA is a research and decision-support tool.
+
+It is **not** intended to diagnose individuals, predict personal health outcomes, or provide medical advice.
+
+---
+
+### Development Philosophy
+
+The project will emphasize:
+
+* transparency
+* reproducibility
+* explainable methods
+* maintainability
+* practical usefulness
+
+Complexity will only be added when it produces meaningful analytical value.
+
+---
+
+### Technical Direction
+
+Version 1 will remain fully offline after data acquisition.
+
+The finished deliverables should require no server infrastructure, cloud hosting, user accounts, or ongoing maintenance.
+
+---
+
+## Initial Deliverables
+
+The following foundational documents have been created:
+
+* Executive Report (Foundation)
+* Methodology
+* Data Dictionary
+* Project Principles
+* Project Log
+
+Additional foundational documents will be added before implementation begins.
+
+---
+
+## Project Vision
+
+The long-term vision is an interactive research atlas that helps answer questions such as:
+
+* Which communities experience the greatest overall health burden?
+* Which characteristics consistently accompany high health burden?
+* Which communities demonstrate unusual resilience despite socioeconomic disadvantage?
+* Which communities may benefit most from targeted interventions?
+
+The atlas is intended to provide insight rather than definitive explanations.
+
+---
+
+## Version 1 Success Criteria
+
+Version 1 will be considered complete when it includes:
+
+* A documented methodology
+* A transparent Health Burden Index
+* County-level rankings
+* Community comparison capability
+* Similar county identification
+* A downloadable Excel workbook
+* A static offline HTML atlas
+* Supporting documentation
+* A complete data dictionary
+
+No additional features are required for Version 1.
+
+---
+
+## Lessons Learned
+
+The project's original concept centered on identifying the "sickest places in America."
+
+Early research demonstrated that a more valuable objective is understanding the combinations of health, community, and healthcare characteristics that consistently occur together.
+
+This shift transformed CHIA from a simple ranking exercise into a broader community health intelligence framework.
+
+---
+
+## Next Milestone
+
+**Version 0.2.0 — Foundation Complete**
+
+Planned work:
+
+* Project Charter
+* Data Sources
+* Health Burden Index Specification
+* Community Vulnerability Index
+* Healthcare Access Index
+* System architecture for the offline atlas
+
+---
+
+*This log serves as the historical record of significant project decisions, milestones, and direction. It documents not only what changed, but why those decisions were made.*

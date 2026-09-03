@@ -1,0 +1,77 @@
+# Community Health Intelligence Atlas (CHIA)
+
+# Project Charter
+
+## Mission
+
+Develop an offline, research-grade atlas that integrates authoritative public health, demographic, socioeconomic, and healthcare data to better understand patterns of community health burden across the United States.
+
+---
+
+# Objectives
+
+CHIA will:
+
+* Measure overall community health burden.
+* Identify geographic patterns and clusters.
+* Compare similar communities.
+* Identify resilient communities that outperform expectations.
+* Provide transparent, reproducible analysis.
+* Support research and informed decision-making.
+
+---
+
+# Out of Scope (Version 1)
+
+CHIA will not:
+
+* Diagnose individuals.
+* Predict individual health outcomes.
+* Provide medical advice.
+* Infer causation from correlation.
+* Require cloud hosting or user accounts.
+* Become a continuously maintained web platform.
+
+---
+
+# Geographic Scope
+
+* United States only
+* Primary unit: Counties
+* Future versions may include Census Tracts and ZCTAs.
+
+---
+
+# Guiding Values
+
+* Transparency
+* Scientific integrity
+* Reproducibility
+* Simplicity
+* Practical usefulness
+
+---
+
+# Version 1 Deliverables
+
+* Health Burden Index
+* County rankings
+* Community profiles
+* Similar county analysis
+* Excel workbook
+* Offline HTML atlas
+* Executive report
+* Methodology
+* Data dictionary
+
+---
+
+# Definition of Done
+
+Version 1 is complete when all planned deliverables are documented, reproducible, functional offline, and capable of answering the project's primary research questions.
+
+---
+
+# Future Vision
+
+Future enhancements will only be considered after Version 1 is complete and will be evaluated against the Project Principles before being added.
