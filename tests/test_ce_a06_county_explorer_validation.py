@@ -30,7 +30,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_DATABASE = PROJECT_ROOT / "Data" / "Model" / "chia_v01.sqlite"
 
 EXPECTED_PRODUCTION_SHA256 = (
-    "db493c131e3c573e98236e17bda856b683cd50d4bd4ab19c7fd3fde15b8b72c4"
+    "0d8bb417ccf72acf0cef7d17bcca15627900d0df419fc259de553a95b9aa2966"
 )
 
 

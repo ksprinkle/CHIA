@@ -119,6 +119,296 @@ SEED_PATH = MODEL_DIR / "seed_v01.sql"
 
 
 # ------------------------------------------------------------
+# County reference data (CE-D01 Issue 2 correction)
+# ------------------------------------------------------------
+#
+# The Primary Care HPSA file's own `CountyName` column is a placeholder
+# (literal 0 for every row; see the CE-D01 Issue 2 investigation) and never
+# carried a `StateName` column at all. `county_name` / `state_name` are
+# instead resolved from the U.S. Census Bureau's 2020 PL 94-171 redistricting
+# geoheader files, already present in this repository. `state_abbr` is
+# unaffected -- it continues to come from the Primary Care HPSA file exactly
+# as before.
+
+RAW_DIR = DATA_DIR / "Raw"
+CENSUS_GEOHEADER_DIR = RAW_DIR / "Census" / "PL94_171_2020" / "Unzipped"
+PLACES_PATH = (
+    RAW_DIR / "PLACES__County_Data_(GIS_Friendly_Format),_2025_release_20260829.csv"
+)
+
+# SUMLEV "050" (state-county) rows carry the county-level AREANAME; "040"
+# (state) rows carry the state-level one. Both fields sit at fixed offsets
+# from the end of every row in this fixed-format, pipe-delimited file,
+# confirmed against all 51 state/DC geoheader files during the CE-D01 Issue 2
+# investigation (field 87 of 97, i.e. index -10; the GEOID in field 9, index
+# 8, ends with the 5-digit FIPS).
+_CENSUS_SUMLEV_COUNTY = "050"
+_CENSUS_SUMLEV_STATE = "040"
+_CENSUS_AREANAME_INDEX = -10
+_CENSUS_GEOID_INDEX = 8
+_CENSUS_STATE_ABBR_INDEX = 1
+_CENSUS_SUMLEV_INDEX = 2
+
+# The 2020 PL 94-171 geoheader files predate Connecticut's 2022 FIPS
+# reassignment from 8 counties to 9 planning regions, so they supply no
+# AREANAME for these 9 (verified missing during the CE-D01 Issue 2
+# investigation). The canonical county universe already uses the new codes
+# (sourced from the Primary Care HPSA file), and the already-validated
+# PLACES dataset has the current code -> base name for each. Per the
+# approved CE-D01 Issue 2 decision, these base names are normalized to the
+# region's established "<Name> Planning Region" designation -- documented
+# here, not derived automatically, so the substitution stays explicit and
+# auditable. `load_connecticut_planning_region_names` re-reads PLACES and
+# raises if its name for any of these 9 has since drifted from what was
+# verified, rather than silently trusting a hardcoded name.
+CONNECTICUT_PLANNING_REGION_BASE_NAMES = {
+    "09110": "Capitol",
+    "09120": "Greater Bridgeport",
+    "09130": "Lower Connecticut River Valley",
+    "09140": "Naugatuck Valley",
+    "09150": "Northeastern Connecticut",
+    "09160": "Northwest Hills",
+    "09170": "South Central Connecticut",
+    "09180": "Southeastern Connecticut",
+    "09190": "Western Connecticut",
+}
+
+
+def load_census_county_names(
+    census_dir: Path = CENSUS_GEOHEADER_DIR,
+) -> dict[str, str]:
+    """Return ``{county_fips: AREANAME}`` from the 2020 PL 94-171 geoheader
+    files, e.g. ``'01001' -> 'Autauga County'``, ``'22001' -> 'Acadia
+    Parish'``, ``'02020' -> 'Anchorage Municipality'``, ``'51710' ->
+    'Norfolk city'``. AREANAME is the Census Bureau's own legal/statistical
+    area name, already correctly suffixed per entity type -- no suffix is
+    appended or guessed here.
+    """
+
+    names: dict[str, str] = {}
+
+    for path in sorted(census_dir.glob("*/*geo2020.pl")):
+        with path.open(encoding="latin-1") as handle:
+            for line in handle:
+                fields = line.rstrip("\n").split("|")
+                if fields[_CENSUS_SUMLEV_INDEX] == _CENSUS_SUMLEV_COUNTY:
+                    fips = fields[_CENSUS_GEOID_INDEX][-5:]
+                    names[fips] = fields[_CENSUS_AREANAME_INDEX]
+
+    return names
+
+
+def load_census_state_names(
+    census_dir: Path = CENSUS_GEOHEADER_DIR,
+) -> dict[str, str]:
+    """Return ``{state_abbr: full state name}`` from each geoheader file's
+    state-level (SUMLEV 040) row, e.g. ``'AL' -> 'Alabama'``.
+    """
+
+    names: dict[str, str] = {}
+
+    for path in sorted(census_dir.glob("*/*geo2020.pl")):
+        with path.open(encoding="latin-1") as handle:
+            for line in handle:
+                fields = line.rstrip("\n").split("|")
+                if fields[_CENSUS_SUMLEV_INDEX] == _CENSUS_SUMLEV_STATE:
+                    names[fields[_CENSUS_STATE_ABBR_INDEX]] = (
+                        fields[_CENSUS_AREANAME_INDEX]
+                    )
+
+    return names
+
+
+def load_connecticut_planning_region_names(
+    places_path: Path = PLACES_PATH,
+) -> dict[str, str]:
+    """Return ``{county_fips: "<Name> Planning Region"}`` for the 9
+    Connecticut planning-region FIPS the 2020 Census geoheader predates (see
+    ``CONNECTICUT_PLANNING_REGION_BASE_NAMES`` above). Raises if PLACES is
+    missing any of the 9, or if its base name for any of them has changed
+    since the CE-D01 Issue 2 investigation -- this must not silently apply a
+    stale normalization.
+    """
+
+    import csv
+
+    found: dict[str, str] = {}
+
+    with places_path.open(encoding="utf-8-sig", newline="") as handle:
+        for row in csv.DictReader(handle):
+            fips = row["CountyFIPS"].strip().zfill(5)
+            if fips in CONNECTICUT_PLANNING_REGION_BASE_NAMES:
+                found[fips] = row["CountyName"].strip()
+
+    missing = set(CONNECTICUT_PLANNING_REGION_BASE_NAMES) - set(found)
+    if missing:
+        raise ValueError(
+            "PLACES is missing the Connecticut planning-region FIPS: "
+            f"{sorted(missing)}"
+        )
+
+    drifted = {
+        fips: (expected, found[fips])
+        for fips, expected in CONNECTICUT_PLANNING_REGION_BASE_NAMES.items()
+        if found[fips] != expected
+    }
+    if drifted:
+        raise ValueError(
+            "PLACES county name(s) for Connecticut planning regions have "
+            f"changed since the CE-D01 Issue 2 investigation: {drifted}"
+        )
+
+    return {
+        fips: f"{name} Planning Region"
+        for fips, name in found.items()
+    }
+
+
+def resolve_county_reference(
+    counties: pd.DataFrame,
+) -> list[tuple[str, str, str, str, str]]:
+    """Resolve ``(county_fips, state_fips, county_name, state_name,
+    state_abbr)`` for the full canonical county universe (approved CE-D01
+    Issue 2 naming convention): ``county_name`` from the Census geoheader
+    (Connecticut-planning-region-patched), ``state_name`` from the Census
+    geoheader's state-level rows, ``state_abbr`` unchanged from the Primary
+    Care HPSA file. Raises unless every canonical FIPS resolves to a
+    non-empty name, state, and abbreviation, with no duplicates.
+    """
+
+    census_names = load_census_county_names()
+    census_states = load_census_state_names()
+    ct_patch = load_connecticut_planning_region_names()
+
+    records: list[tuple[str, str, str, str, str]] = []
+    unresolved: list[tuple[str, str | None, str | None, str | None]] = []
+
+    for _, row in counties.iterrows():
+        fips = row["county_fips"]
+        state_abbr = (
+            None
+            if pd.isna(row["StateAbbr"])
+            else str(row["StateAbbr"]).strip()
+        )
+
+        county_name = census_names.get(fips) or ct_patch.get(fips)
+        state_name = census_states.get(state_abbr) if state_abbr else None
+
+        if not county_name or not state_name or not state_abbr:
+            unresolved.append((fips, county_name, state_name, state_abbr))
+            continue
+
+        records.append((fips, fips[:2], county_name, state_name, state_abbr))
+
+    if unresolved:
+        raise ValueError(
+            f"{len(unresolved)} canonical FIPS could not be fully resolved "
+            f"(fips, county_name, state_name, state_abbr): {unresolved[:10]}"
+        )
+
+    fips_seen = [record[0] for record in records]
+    if len(fips_seen) != len(counties):
+        raise ValueError(
+            f"Resolved {len(fips_seen)} county reference records; "
+            f"expected {len(counties)}."
+        )
+    if len(set(fips_seen)) != len(fips_seen):
+        raise ValueError("Duplicate county_fips in resolved county reference data.")
+
+    return records
+
+
+def _replace_county_reference(
+    database_path: Path,
+    records: list[tuple[str, str, str, str, str]],
+) -> None:
+    """Transactionally replace the ``county`` table's content with
+    ``records``, leaving every other table byte-for-byte untouched.
+
+    A full ``build_v01_database.py`` run wipes and recreates the entire
+    database file -- but no script in this pipeline currently regenerates
+    MUA/P's ``dimension_score`` rows (or any other table) from scratch (see
+    the CE-D01 Issue 2 investigation), so that would silently discard
+    otherwise-irreplaceable analytical data. When the canonical database
+    already exists, this scoped replace is used instead: it deletes and
+    reinserts only ``county`` (deferring foreign-key enforcement to commit
+    time, since ``county_period.county_fips`` references it), then verifies
+    the row count, the FIPS universe, and referential integrity are exactly
+    preserved before committing; any failure rolls back the entire change.
+    """
+
+    connection = sqlite3.connect(database_path)
+    try:
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute("PRAGMA defer_foreign_keys = ON")
+        connection.execute("BEGIN IMMEDIATE")
+
+        before_fips = {
+            row[0]
+            for row in connection.execute("SELECT county_fips FROM county")
+        }
+
+        connection.execute("DELETE FROM county")
+        connection.executemany(
+            """
+            INSERT INTO county (
+                county_fips,
+                state_fips,
+                county_name,
+                state_name,
+                state_abbr
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            records,
+        )
+
+        after_rows = connection.execute(
+            "SELECT county_fips, county_name, state_name, state_abbr FROM county"
+        ).fetchall()
+        after_fips = {row[0] for row in after_rows}
+
+        if len(after_rows) != len(before_fips):
+            raise ValueError(
+                f"county row count changed: {len(before_fips)} -> {len(after_rows)}."
+            )
+        if after_fips != before_fips:
+            raise ValueError(
+                "county_fips universe changed; it must be preserved exactly."
+            )
+        if len(after_fips) != len(after_rows):
+            raise ValueError("Duplicate county_fips after replacement.")
+        for fips, county_name, state_name, state_abbr in after_rows:
+            if not county_name or not state_name or not state_abbr:
+                raise ValueError(
+                    f"{fips}: empty county_name/state_name/state_abbr after "
+                    "replacement."
+                )
+
+        foreign_key_errors = connection.execute("PRAGMA foreign_key_check").fetchall()
+        if foreign_key_errors:
+            raise ValueError(
+                f"Foreign-key validation failed: {foreign_key_errors}"
+            )
+
+        connection.commit()
+
+        print()
+        print("=" * 70)
+        print("COUNTY REFERENCE DATA REPLACED (CE-D01 Issue 2 correction)")
+        print("=" * 70)
+        print(f"Database:        {database_path}")
+        print(f"Rows replaced:   {len(after_rows):,}")
+        print(f"FIPS universe:   preserved ({len(after_fips):,} unchanged)")
+        print("=" * 70)
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+# ------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------
 
@@ -217,11 +507,13 @@ def main():
     # Build canonical county universe
     # --------------------------------------------------------
 
- # Primary Care HPSA defines the canonical U.S. county universe.
+ # Primary Care HPSA defines the canonical U.S. county universe (FIPS +
+    # state_abbr only -- this file's own CountyName column is a placeholder
+    # and is not used; see resolve_county_reference / CE-D01 Issue 2).
     primary_care = sources["primary_care"]
 
     counties = primary_care[
-        ["FIPS", "StateAbbr", "CountyName"]
+        ["FIPS", "StateAbbr"]
     ].copy()
 
     counties["county_fips"] = normalize_fips(
@@ -229,19 +521,31 @@ def main():
     )
 
     counties = counties[
-        ["county_fips", "StateAbbr", "CountyName"]
+        ["county_fips", "StateAbbr"]
     ].drop_duplicates(
         subset=["county_fips"]
     )
 
     print(f"County records identified: {len(counties):,}")
 
+    county_records = resolve_county_reference(counties)
+    print(
+        "County reference records resolved (Census-primary, "
+        f"Connecticut-patched): {len(county_records):,}"
+    )
+
     # --------------------------------------------------------
-    # Create database
+    # Create or update database
     # --------------------------------------------------------
 
     if DATABASE_PATH.exists():
-        DATABASE_PATH.unlink()
+        # See _replace_county_reference's docstring: a full wipe here would
+        # also discard analytical data (most notably MUA/P's
+        # dimension_score) that no script in this pipeline currently
+        # regenerates from scratch. When the canonical database already
+        # exists, only the `county` table's reference fields are replaced.
+        _replace_county_reference(DATABASE_PATH, county_records)
+        return
 
     connection = sqlite3.connect(DATABASE_PATH)
 
@@ -261,41 +565,19 @@ def main():
         # County
         # ----------------------------------------------------
 
-        for _, row in counties.iterrows():
-
-            fips = row["county_fips"]
-
-            state_abbr = (
-                None
-                if pd.isna(row["StateAbbr"])
-                else str(row["StateAbbr"]).strip()
+        connection.executemany(
+            """
+            INSERT INTO county (
+                county_fips,
+                state_fips,
+                county_name,
+                state_name,
+                state_abbr
             )
-
-            county_name = (
-                None
-                if pd.isna(row["CountyName"])
-                else str(row["CountyName"]).strip()
-            )
-
-            connection.execute(
-                """
-                INSERT INTO county (
-                    county_fips,
-                    state_fips,
-                    county_name,
-                    state_name,
-                    state_abbr
-                )
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (
-                    fips,
-                    fips[:2],
-                    county_name or f"FIPS {fips}",
-                    "",
-                    state_abbr or "",
-                ),
-            )
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            county_records,
+        )
 
         # ----------------------------------------------------
         # County period

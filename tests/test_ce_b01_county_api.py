@@ -30,7 +30,7 @@ SOURCE_DATABASE = PROJECT_ROOT / "Data" / "Model" / "chia_v01.sqlite"
 
 EXPECTED_COUNTY_COUNT = 3143
 EXPECTED_PRODUCTION_SHA256 = (
-    "db493c131e3c573e98236e17bda856b683cd50d4bd4ab19c7fd3fde15b8b72c4"
+    "0d8bb417ccf72acf0cef7d17bcca15627900d0df419fc259de553a95b9aa2966"
 )
 
 # Exact canonical `county` schema (Data/Model/schema.sql).
@@ -213,9 +213,14 @@ class CountyDirectoryServiceTest(unittest.TestCase):
             self.assertTrue(record.county_fips.isdigit())
             self.assertIsInstance(record.state_fips, str)
             self.assertIsInstance(record.state_abbr, str)
-        # Names come back exactly as stored (currently placeholders).
-        self.assertEqual({r.county_name for r in records}, {"0"})
-        self.assertEqual({r.state_name for r in records}, {""})
+        # Names come back exactly as stored. CE-D01 Issue 2 corrected the
+        # canonical county_name/state_name from a placeholder to real,
+        # Census-sourced values (see
+        # tests/test_ce_d01_county_reference_correction.py for the full
+        # naming-convention regression coverage); this test only re-asserts
+        # that every row now has *some* non-placeholder name, still verbatim.
+        self.assertTrue(all(r.county_name != "0" for r in records))
+        self.assertTrue(all(r.state_name != "" for r in records))
         # Read-only.
         self.assertEqual(before, after)
         self.assertEqual(after, EXPECTED_PRODUCTION_SHA256)
