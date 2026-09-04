@@ -13,7 +13,12 @@ describe('CountySelector (CE-C02)', () => {
     // and no post-assertion state update escapes act().
     stubCountiesFetch(() => new Promise<Response>(() => {}))
     renderApp(['/'])
-    expect(screen.getByRole('status')).toHaveTextContent(/loading counties/i)
+    // CE-E02: the U.S. map landing page (HomePage) also reflects the same
+    // shared directory loading state as its own separate "status" region --
+    // same dual-render pattern already established for CountyPage (see
+    // CountyPage.test.tsx's "surfaces the county-list error" test).
+    expect(screen.getAllByRole('status').length).toBeGreaterThan(0)
+    expect(screen.getByText(/loading counties/i)).toBeInTheDocument()
     expect(screen.queryByRole('combobox')).toBeNull()
   })
 
@@ -66,10 +71,16 @@ describe('CountySelector (CE-C02)', () => {
     stubCountiesFetch(new TypeError('network down'))
     renderApp(['/'])
 
-    const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent(/could not be loaded/i)
+    // CE-E02: HomePage also renders its own alert for the same shared
+    // directory error; find the county-selector-specific one by its exact
+    // wording (same dual-render pattern as CountyPage.test.tsx).
+    await waitFor(() => expect(screen.getAllByRole('alert').length).toBeGreaterThan(0))
+    const alert = screen
+      .getAllByRole('alert')
+      .find((el) => /the list of counties could not be loaded/i.test(el.textContent ?? ''))
+    expect(alert).toBeTruthy()
     expect(
-      within(alert).getByRole('button', { name: /try again/i }),
+      within(alert as HTMLElement).getByRole('button', { name: /try again/i }),
     ).toBeInTheDocument()
   })
 

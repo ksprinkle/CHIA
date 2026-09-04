@@ -1,8 +1,9 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 
 import {
   makeCounties,
   makeExplorer,
+  makeMultiStateCounties,
   renderApp,
   stubApi,
   stubCountiesFetch,
@@ -127,5 +128,53 @@ describe('CE-C02 county selection & URL state', () => {
       .map((call) => String(call[0]))
       .filter((url) => url.includes('/explorer'))
     expect(explorerCalls).toEqual(['/api/v1/counties/01001/explorer'])
+  })
+})
+
+describe('CE-E02 U.S. map landing & state navigation', () => {
+  it('the map and the accessible state selector resolve the same state to the same URL', async () => {
+    stubCountiesFetch(makeMultiStateCounties())
+
+    // Map selection.
+    const mapRun = renderApp(['/'])
+    const map = await screen.findByRole('group', { name: /map of the united states/i })
+    const california = await within(map).findByRole('button', { name: /select california/i })
+    fireEvent.click(california)
+    const mapDestination = mapRun.router.state.location.pathname
+    mapRun.unmount()
+
+    // Accessible-selector selection, from a fresh render.
+    const selectRun = renderApp(['/'])
+    const select = await screen.findByRole('combobox', { name: /^state$/i })
+    fireEvent.change(select, { target: { value: '06' } })
+    const selectDestination = selectRun.router.state.location.pathname
+
+    expect(mapDestination).toBe('/states/06')
+    expect(selectDestination).toBe('/states/06')
+    expect(mapDestination).toBe(selectDestination)
+  })
+
+  it('the U.S. map landing page still surfaces the existing global county selector', async () => {
+    stubCountiesFetch(makeMultiStateCounties())
+    renderApp(['/'])
+
+    expect(
+      await screen.findByRole('combobox', { name: /county/i }),
+    ).toBeInTheDocument()
+    expect(await screen.findByRole('combobox', { name: /^state$/i })).toBeInTheDocument()
+  })
+
+  it('selecting a state from the map navigates to a working state placeholder route', async () => {
+    stubCountiesFetch(makeMultiStateCounties())
+    const { router } = renderApp(['/'])
+
+    const map = await screen.findByRole('group', { name: /map of the united states/i })
+    const alabama = await within(map).findByRole('button', { name: /select alabama/i })
+    fireEvent.click(alabama)
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/states/01'))
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /^alabama$/i }),
+    ).toBeInTheDocument()
   })
 })

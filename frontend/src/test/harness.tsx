@@ -12,16 +12,65 @@ import type {
 
 type FetchImpl = (...args: unknown[]) => Promise<Response> | Response
 
-function okJson(body: unknown): Response {
-  return { ok: true, status: 200, json: async () => body } as Response
+/**
+ * These previously returned a plain object (not a real `Promise`). The app's
+ * own `await fetch(...)` tolerates that (awaiting a non-thenable resolves
+ * immediately), but CE-E02's `react-simple-maps` calls `fetch(url).then(...)`
+ * directly, which throws "fetch(...).then is not a function" against a bare
+ * object. Wrapping in a genuine `Promise.resolve` fixes that without
+ * changing behaviour for any existing (non-`.then`-chaining) caller.
+ */
+function okJson(body: unknown): Promise<Response> {
+  return Promise.resolve({ ok: true, status: 200, json: async () => body } as Response)
 }
 
-function errStatus(status: number): Response {
-  return {
+function errStatus(status: number): Promise<Response> {
+  return Promise.resolve({
     ok: false,
     status,
     json: async () => ({ detail: `status ${status}` }),
-  } as Response
+  } as Response)
+}
+
+/**
+ * CE-E02: a minimal, valid TopoJSON fixture standing in for the real
+ * committed `frontend/public/geo/us-states.topojson` asset. Two features
+ * (`01` Alabama, `06` California) is enough to exercise `UsStateMap` /
+ * `StateSelect` interaction without depending on the real ~1.9 MB asset in
+ * unit tests. Every stub below routes a `/geo/` request here so that
+ * `HomePage` rendering the map never hits an unstubbed-fetch failure.
+ */
+export const STUB_US_STATES_TOPOJSON = {
+  type: 'Topology',
+  arcs: [
+    [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+      [0, 0],
+    ],
+    [
+      [2, 0],
+      [3, 0],
+      [3, 1],
+      [2, 1],
+      [2, 0],
+    ],
+  ],
+  objects: {
+    states: {
+      type: 'GeometryCollection',
+      geometries: [
+        { type: 'Polygon', id: '01', properties: { name: 'Alabama' }, arcs: [[0]] },
+        { type: 'Polygon', id: '06', properties: { name: 'California' }, arcs: [[1]] },
+      ],
+    },
+  },
+}
+
+function isGeographyRequest(url: string): boolean {
+  return url.includes('/geo/')
 }
 
 /**
@@ -29,8 +78,10 @@ function errStatus(status: number): Response {
  *
  * URL-aware: an Explorer request (`/counties/{fips}/explorer`) resolves to 404
  * so a county-route test that does not explicitly stub the Explorer degrades to
- * a "not found" profile rather than parsing a county-list payload. Tests that
- * need a real Explorer payload use {@link stubApi}.
+ * a "not found" profile rather than parsing a county-list payload. A
+ * geography request (`/geo/...`, CE-E02) resolves to {@link
+ * STUB_US_STATES_TOPOJSON}. Tests that need a real Explorer payload use
+ * {@link stubApi}.
  */
 export function stubCountiesFetch(payload: CountyListResponse | Error | FetchImpl) {
   let impl: FetchImpl
@@ -42,7 +93,9 @@ export function stubCountiesFetch(payload: CountyListResponse | Error | FetchImp
     }
   } else {
     impl = (...args: unknown[]) => {
-      if (String(args[0]).includes('/explorer')) return errStatus(404)
+      const url = String(args[0])
+      if (isGeographyRequest(url)) return okJson(STUB_US_STATES_TOPOJSON)
+      if (url.includes('/explorer')) return errStatus(404)
       return okJson(payload)
     }
   }
@@ -61,6 +114,7 @@ interface ApiStub {
 export function stubApi(stub: ApiStub = {}) {
   const impl: FetchImpl = (...args: unknown[]) => {
     const url = String(args[0])
+    if (isGeographyRequest(url)) return okJson(STUB_US_STATES_TOPOJSON)
     const explorerFips = url.match(/\/counties\/(\d{5})\/explorer/)?.[1]
     if (explorerFips !== undefined) {
       const result = stub.explorer ? stub.explorer(explorerFips) : 404
@@ -91,6 +145,38 @@ export function makeCounties(fipsList: string[]): CountyListResponse {
       state_name: '',
     })),
   }
+}
+
+/**
+ * CE-E02: counties spanning two distinct states (matching
+ * {@link STUB_US_STATES_TOPOJSON}'s `01`/`06` features), for tests that
+ * exercise state derivation, the map, and the accessible state selector.
+ */
+export function makeMultiStateCounties(): CountyListResponse {
+  const counties: CountyListResponse['counties'] = [
+    {
+      county_fips: '01001',
+      state_fips: '01',
+      state_abbr: 'AL',
+      county_name: 'Autauga County',
+      state_name: 'Alabama',
+    },
+    {
+      county_fips: '01003',
+      state_fips: '01',
+      state_abbr: 'AL',
+      county_name: 'Baldwin County',
+      state_name: 'Alabama',
+    },
+    {
+      county_fips: '06075',
+      state_fips: '06',
+      state_abbr: 'CA',
+      county_name: 'San Francisco County',
+      state_name: 'California',
+    },
+  ]
+  return { count: counties.length, counties }
 }
 
 interface DimensionOverride extends Partial<Omit<DimensionProfile, 'primary_measure'>> {
