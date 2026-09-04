@@ -1,0 +1,111 @@
+# Community Health Intelligence Atlas (CHIA)
+
+# Geographic Data Sources
+
+## Purpose
+
+This document records the provenance of the geographic boundary assets used by the County Explorer v0.2 map-first UX (CE-E01), so that every committed TopoJSON file can be traced back to its exact Census source, vintage, and conversion parameters.
+
+This is a presentation/navigation data layer (governing v0.2 UX specification, section 11.1/11.13). It is not CHIA analytical data, and it does not participate in the CE-A00..D01 analytical pipeline.
+
+---
+
+# Source
+
+| Field | Value |
+| --- | --- |
+| Product | U.S. Census Bureau Cartographic Boundary Files |
+| Vintage | 2025 |
+| State resolution | 1:20,000,000 ("20m") |
+| County resolution | 1:500,000 ("500k") |
+| State source URL | `https://www2.census.gov/geo/tiger/GENZ2025/shp/cb_2025_us_state_20m.zip` |
+| County source URL | `https://www2.census.gov/geo/tiger/GENZ2025/shp/cb_2025_us_county_500k.zip` |
+| License | Public domain (U.S. federal government work; no copyright, no attribution required) |
+| Raw download location | `Data/Raw/GIS/Census Cartographic Boundary Files/` (gitignored, not committed) |
+
+The 2025 vintage was selected because it is the most recent Census Cartographic Boundary File release and was verified to correctly represent CHIA's existing 3,143-county universe, including all 9 Connecticut planning regions (GEOIDs `09110`–`09190`), which replaced Connecticut's legacy 8 counties in Census's county-equivalent geography beginning with an earlier vintage.
+
+State resolution (20m) was chosen for the national landing view, where fine county-level detail is unnecessary and a smaller file directly benefits initial load time. County resolution (500k) was chosen for state-level display, where individual county shapes need to remain recognizable.
+
+---
+
+# Geographic Identifiers and CHIA Join
+
+| Census field | Type | CHIA counterpart |
+| --- | --- | --- |
+| `GEOID` (county file, 5 chars) | State FIPS + county FIPS | `county.county_fips` |
+| `GEOID` (state file, 2 chars) | State FIPS | `county.state_fips` |
+
+The join is a direct string match — no lookup table, crosswalk, or name-based matching is used or required. `GET /api/v1/counties` already returns `county_fips` and `state_fips` in this exact format (governing v0.1/v0.2 specifications; CE-B01/CE-D01).
+
+---
+
+# Conversion
+
+| Field | Value |
+| --- | --- |
+| Tool | [mapshaper](https://github.com/mapshaper/mapshaper) |
+| Version | `0.7.58` (pinned) |
+| Invocation | `npx --yes mapshaper@0.7.58 ...` — a build-time-only CLI invocation. mapshaper is never added to `requirements.txt`, `frontend/package.json`, or `frontend/package-lock.json`, and is never imported at application runtime. |
+| Script | `Data/Model/convert_v02_geographic_boundaries.py` |
+| Simplification | `-simplify 10% keep-shapes` — a further topology-preserving reduction on top of Census's own cartographic generalization for the selected resolution tier. `keep-shapes` prevents small/thin county-equivalents from being simplified away entirely. `-clean` repairs any self-intersections the simplification pass introduces. |
+| Filter | Both layers are filtered to CHIA's 51 state-equivalents (the 50 states + DC) before conversion, using an explicit FIPS allowlist. This excludes Puerto Rico, the only non-CHIA feature present in the Census state file. |
+| County split | `-split STATEFP` with `singles` produces one output file per state, named by state FIPS, so the frontend never loads more than one state's county geometry at a time. |
+| id-field | `GEOID` — set as the TopoJSON feature `id` for both layers, used directly by the FIPS/GEOID validation. |
+
+---
+
+# Generated File Structure
+
+```
+Data/Model/geo/
+  us-states.topojson                 (national, all 51 CHIA states)
+  counties/
+    01.topojson                      (Alabama counties)
+    02.topojson                      (Alaska boroughs/census areas)
+    ...
+    56.topojson                      (Wyoming counties)
+                                      (51 files total, one per CHIA state_fips)
+
+frontend/public/geo/
+  us-states.topojson                 (verbatim copy)
+  counties/
+    <state_fips>.topojson            (verbatim copies, 51 files)
+```
+
+`Data/Model/geo/` holds the build-script output; `frontend/public/geo/` holds the final, committed, runtime-served copies. The copy step performs no further conversion.
+
+Both `Data/Model/geo/` and `frontend/public/geo/` are committed to Git — these are small (~1.9 MB combined), public-domain, presentation-layer assets, not a regenerated analytical artifact, and committing them means the frontend runs without requiring a fresh Census download/conversion pass in every environment.
+
+---
+
+# Rationale for State-Split County Assets
+
+Rendering all 3,143 counties' geometry at once is unnecessary for a UX where the user is always looking at either the national state map or a single selected state's counties (governing v0.2 UX specification, section 11.7/11.8). Splitting by state keeps each load small (largest file, Texas, is ~125 KB) and means adding or updating one state's geometry never touches the other 50 files.
+
+---
+
+# Validation Results
+
+Produced by `Data/Model/validate_v02_geographic_join.py` and mirrored in `tests/test_ce_e01_geographic_foundation.py`, against `Data/Model/chia_v01.sqlite`:
+
+| Check | Result |
+| --- | --- |
+| CHIA county count | 3,143 / 3,143 |
+| Every CHIA `county_fips` has a matching Census `GEOID` | 3,143 / 3,143 matched |
+| Duplicate GEOIDs in generated assets | 0 |
+| GEOID state-prefix matches stored `state_fips` | 0 mismatches |
+| Empty CHIA county geometries | 0 |
+| CHIA state count | 51 / 51 |
+| All CHIA `state_fips` represented in national state file | 51 / 51 matched |
+| Connecticut planning regions (`09110`–`09190`) | 9 / 9 verified |
+| Representative county-equivalent types (DC, Anchorage Municipality, Matanuska-Susitna Borough, Yakutat City and Borough, Fairfax city, Roanoke city, St. Louis city) | verified |
+
+---
+
+# Known Limitations
+
+* **Puerto Rico and other U.S. territories are excluded by design** — CHIA's canonical county universe covers only the 50 states + DC, so the filter step removes them before conversion.
+* **One Census county has no CHIA counterpart:** GEOID `48301` (Loving County, Texas — the least populous county in the United States). This is a pre-existing characteristic of CHIA's canonical county universe (Loving County is absent from `chia_v01.sqlite`, unrelated to this geographic work) and is not a defect in the geographic join. The validation rule only requires every *CHIA* county to resolve to Census geometry, not the reverse, so this is expected and does not fail validation.
+* The 10% simplification is chosen for web file size and is not intended for precise area/boundary GIS analysis — it is a presentation/navigation layer only (governing v0.2 UX specification, section 11.1).
+* This document and the underlying assets reflect the 2025 Census vintage only. A future Census vintage change (e.g., a boundary revision) would require re-running `convert_v02_geographic_boundaries.py` and `validate_v02_geographic_join.py`, and updating this document accordingly.

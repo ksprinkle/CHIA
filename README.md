@@ -18,10 +18,12 @@ v0.1 data model and database baseline validated.
 
 The next implementation phase is the County Explorer: an interactive county-level map and profile experience built on the validated v0.1 data model.
 
+The geographic foundation for the map (U.S. state and county boundary data, validated against CHIA's canonical FIPS universe) has been established.
+
 ## Documentation
 
 Project methodology, data sources, principles, and the implementation-aligned v0.1 data-model specification are maintained in the project documentation.
 
 ## Status
 
-Research / development — not yet a public production application.
+Research / development â€” not yet a public production application.

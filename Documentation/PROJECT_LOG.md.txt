@@ -126,4 +126,37 @@ Planned work:
 
 ---
 
+# Version 0.2.0 — County Explorer v0.2 UX: Geographic Foundation (CE-E01)
+
+**Date:** September 4, 2026
+
+## Scope
+
+CE-E01 established the geographic data foundation required for the future County Explorer map-first UX (U.S. map → state selection → county selection → county profile), without building or redesigning any map UI. This slice is strictly a data-foundation slice, per the approved County Explorer UX v0.2 implementation specification (sections 10, 11, 13, 14).
+
+## Source
+
+U.S. Census Bureau Cartographic Boundary Files, 2025 vintage (state 1:20,000,000; county 1:500,000). Public domain. Full provenance recorded in `Documentation/GEOGRAPHIC_DATA_SOURCES.md.txt`.
+
+## Generated Assets
+
+* `Data/Model/geo/us-states.topojson` — national state boundaries, all 51 CHIA state-equivalents.
+* `Data/Model/geo/counties/<state_fips>.topojson` — county boundaries, one file per state (51 files).
+* Verbatim copies committed at `frontend/public/geo/` for frontend consumption.
+* Produced by `Data/Model/convert_v02_geographic_boundaries.py`, using mapshaper as a build-time-only tool (invoked via `npx`; not added to `requirements.txt` or `frontend/package.json`).
+
+## Validation
+
+`Data/Model/validate_v02_geographic_join.py` confirmed: all 3,143 CHIA counties resolve to a matching Census GEOID with zero duplicates; all 51 CHIA states represented; zero state-FIPS mismatches; zero empty geometries; all 9 Connecticut planning regions verified; representative county-equivalent types (DC, Alaska boroughs/census areas, Virginia independent cities, Missouri independent city) verified.
+
+## Tests
+
+`tests/test_ce_e01_geographic_foundation.py` added (12 tests). Full existing CE-A00..D01 regression suite re-run and confirmed unaffected.
+
+## Status
+
+Geographic foundation complete. No database, schema, API, or analytical change. No map UI implemented. County Explorer visualization/map UX remains a future slice (CE-E02+).
+
+---
+
 *This log serves as the historical record of significant project decisions, milestones, and direction. It documents not only what changed, but why those decisions were made.*

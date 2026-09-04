@@ -14,6 +14,12 @@ Data/Raw/
 Data/Processed/
 Data/Outputs/
 
+# Generated intermediate geographic assets (CE-E01) -- regenerated from
+# Data/Raw/GIS/Census Cartographic Boundary Files/ via
+# Data/Model/convert_v02_geographic_boundaries.py. The committed runtime
+# copy lives at frontend/public/geo/, not here.
+Data/Model/geo/
+
 # Local/editor files
 .vscode/
 .DS_Store
