@@ -8,6 +8,13 @@ import type { AccessProfile, SourceRef } from '../lib/types'
  * `dataset_name`, `reference_period`. All v0.1 `url` / `accessed_at` values are
  * null, so no external links and no accessed dates are rendered. The
  * dimension-to-source association comes from `dimension.source_id`.
+ *
+ * CE-E04: the full content is unchanged but now sits behind a native
+ * `<details>` disclosure, collapsed by default (governing specification
+ * section 6.11: provenance "should be accessible without overwhelming the
+ * primary experience"), matching the existing `SupportingEvidence` pattern.
+ * The section itself remains a labelled region via the `<h2>` outside the
+ * disclosure, so it stays identifiable even collapsed.
  */
 export function ProvenancePanel({
   sources,
@@ -25,46 +32,50 @@ export function ProvenancePanel({
     <section className="provenance" aria-labelledby="provenance-heading">
       <h2 id="provenance-heading">Sources</h2>
 
-      {sources.length === 0 ? (
-        <p className="provenance__empty">No sources recorded.</p>
-      ) : (
-        <ul className="provenance__list">
-          {sources.map((source) => {
-            const usedBy = dimensionNamesForSource(source.source_id)
-            return (
-              <li key={source.source_id} className="provenance__item">
-                <p className="provenance__name">{source.source_name}</p>
-                <dl className="provenance__meta">
-                  {source.publisher ? (
-                    <div>
-                      <dt>Publisher</dt>
-                      <dd>{source.publisher}</dd>
-                    </div>
-                  ) : null}
-                  {source.dataset_name ? (
-                    <div>
-                      <dt>Dataset</dt>
-                      <dd>{source.dataset_name}</dd>
-                    </div>
-                  ) : null}
-                  {source.reference_period ? (
-                    <div>
-                      <dt>Reference period</dt>
-                      <dd>{source.reference_period}</dd>
-                    </div>
-                  ) : null}
-                  {usedBy.length > 0 ? (
-                    <div>
-                      <dt>Used by</dt>
-                      <dd>{usedBy.join(', ')}</dd>
-                    </div>
-                  ) : null}
-                </dl>
-              </li>
-            )
-          })}
-        </ul>
-      )}
+      <details className="provenance__disclosure">
+        <summary className="provenance__summary">View sources</summary>
+
+        {sources.length === 0 ? (
+          <p className="provenance__empty">No sources recorded.</p>
+        ) : (
+          <ul className="provenance__list">
+            {sources.map((source) => {
+              const usedBy = dimensionNamesForSource(source.source_id)
+              return (
+                <li key={source.source_id} className="provenance__item">
+                  <p className="provenance__name">{source.source_name}</p>
+                  <dl className="provenance__meta">
+                    {source.publisher ? (
+                      <div>
+                        <dt>Publisher</dt>
+                        <dd>{source.publisher}</dd>
+                      </div>
+                    ) : null}
+                    {source.dataset_name ? (
+                      <div>
+                        <dt>Dataset</dt>
+                        <dd>{source.dataset_name}</dd>
+                      </div>
+                    ) : null}
+                    {source.reference_period ? (
+                      <div>
+                        <dt>Reference period</dt>
+                        <dd>{source.reference_period}</dd>
+                      </div>
+                    ) : null}
+                    {usedBy.length > 0 ? (
+                      <div>
+                        <dt>Used by</dt>
+                        <dd>{usedBy.join(', ')}</dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </details>
     </section>
   )
 }

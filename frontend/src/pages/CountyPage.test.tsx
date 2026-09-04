@@ -130,10 +130,13 @@ describe('CountyPage (CE-C03 county profile)', () => {
     renderApp(['/counties/01001'])
     await screen.findByRole('heading', { level: 1 })
 
+    // CE-E04's snapshot section legitimately also renders the rounded score,
+    // so these are scoped to the dimensions detail region specifically.
+    const dimensions = screen.getByRole('region', { name: /access dimensions/i })
     // 88.757... -> 89 and 12.4 -> 12 (presentation only; not recalculated)
-    expect(screen.getByText('89')).toBeInTheDocument()
-    expect(screen.getByText('12')).toBeInTheDocument()
-    expect(screen.getAllByText('County percentile rank')).toHaveLength(3)
+    expect(within(dimensions).getByText('89')).toBeInTheDocument()
+    expect(within(dimensions).getByText('12')).toBeInTheDocument()
+    expect(within(dimensions).getAllByText('County percentile rank')).toHaveLength(3)
   })
 
   it('qualifies the MUA/P score as not percentile-normalized', async () => {
@@ -180,7 +183,11 @@ describe('CountyPage (CE-C03 county profile)', () => {
     renderApp(['/counties/01001'])
     await screen.findByRole('heading', { level: 1 })
 
-    expect(screen.getByText('Not available')).toBeInTheDocument()
+    // CE-E04's snapshot section legitimately also renders "Not available"
+    // for the same unavailable dimension, so this is scoped to the
+    // dimensions detail region specifically.
+    const dimensions = screen.getByRole('region', { name: /access dimensions/i })
+    expect(within(dimensions).getByText('Not available')).toBeInTheDocument()
     expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(4)
     expect(
       screen.getByRole('heading', { level: 3, name: /dental access/i }),
@@ -870,5 +877,209 @@ describe('CountyPage (CE-C05 interpretation)', () => {
       screen.getByRole('region', { name: /methodology/i }),
     ).toBeInTheDocument()
     expect(screen.getByRole('region', { name: /sources/i })).toBeInTheDocument()
+  })
+})
+
+describe('CountyPage (CE-E04 visual profile)', () => {
+  it('renders the breadcrumb as United States > State > County', async () => {
+    stubApi({
+      counties: makeCounties(['01001']),
+      explorer: (fips) =>
+        makeExplorer(fips, {
+          county: {
+            county_name: 'Autauga County',
+            state_name: 'Alabama',
+            state_abbr: 'AL',
+          },
+        }),
+    })
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1, name: /autauga county/i })
+
+    const breadcrumb = screen.getByRole('navigation', { name: /breadcrumb/i })
+    expect(within(breadcrumb).getByRole('link', { name: /^united states$/i })).toHaveAttribute(
+      'href',
+      '/',
+    )
+    expect(within(breadcrumb).getByRole('link', { name: /^alabama$/i })).toHaveAttribute(
+      'href',
+      '/states/01',
+    )
+    // County is the current-page segment: present, but not a link.
+    expect(
+      within(breadcrumb).getByText('Autauga County', { selector: '[aria-current="page"]' }),
+    ).toBeInTheDocument()
+    expect(within(breadcrumb).queryByRole('link', { name: /autauga county/i })).toBeNull()
+  })
+
+  it('links the state breadcrumb segment to the correct /states/{state_fips} for a second, differently-shaped entity (DC)', async () => {
+    stubApi({
+      counties: makeCounties(['11001']),
+      explorer: (fips) =>
+        makeExplorer(fips, {
+          county: {
+            county_name: 'District of Columbia',
+            state_name: 'District of Columbia',
+            state_abbr: 'DC',
+          },
+        }),
+    })
+    renderApp(['/counties/11001'])
+    await screen.findByRole('heading', { level: 1, name: /district of columbia/i })
+
+    const breadcrumb = screen.getByRole('navigation', { name: /breadcrumb/i })
+    expect(within(breadcrumb).getByRole('link', { name: /^united states$/i })).toHaveAttribute(
+      'href',
+      '/',
+    )
+    expect(
+      within(breadcrumb).getByRole('link', { name: /^district of columbia$/i }),
+    ).toHaveAttribute('href', '/states/11')
+    expect(
+      within(breadcrumb).getByText('District of Columbia', {
+        selector: '[aria-current="page"]',
+      }),
+    ).toBeInTheDocument()
+  })
+
+  it('renders a scannable healthcare access snapshot using the existing dimension values', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const snapshot = screen.getByRole('region', { name: /healthcare access snapshot/i })
+    for (const name of [
+      'Primary Care Access',
+      'Dental Access',
+      'Mental Health Access',
+      'MUA/P Access',
+    ]) {
+      expect(within(snapshot).getByText(name)).toBeInTheDocument()
+    }
+    // Default fixture: primary_care 88, dental 29, mental_health 23 (all
+    // percentile), mua_p 99 (coverage, not percentile) -- see makeExplorer.
+    expect(within(snapshot).getByText('88')).toBeInTheDocument()
+    expect(within(snapshot).getAllByText('percentile')).toHaveLength(3)
+    expect(within(snapshot).getByText('% coverage')).toBeInTheDocument()
+    // Snapshot precedes the detailed dimensions section (visual summary
+    // before the four-dimension detail, per the approved reading order).
+    const dimensions = screen.getByRole('region', { name: /access dimensions/i })
+    expect(
+      snapshot.compareDocumentPosition(dimensions) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('the snapshot marks an unavailable dimension distinctly from a genuine zero', async () => {
+    stubApi({
+      counties: makeCounties(['01001']),
+      explorer: (fips) =>
+        makeExplorer(fips, {
+          dimensions: {
+            primary_care: { available: true, score: 0, primary_measure: { normalized_value: 0 } },
+            dental: { available: false, score: null, score_status: null },
+          },
+        }),
+    })
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const snapshot = screen.getByRole('region', { name: /healthcare access snapshot/i })
+    // Genuine zero is a real, displayed value -- not "Not available".
+    expect(within(snapshot).getByText('0')).toBeInTheDocument()
+    expect(within(snapshot).getAllByText('Not available')).toHaveLength(1)
+  })
+
+  it('methodology is available but collapsed by default, and can be expanded', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    const methodology = await screen.findByRole('region', { name: /methodology/i })
+
+    const summary = within(methodology).getByText('View methodology')
+    const details = summary.closest('details') as HTMLDetailsElement
+    expect(details).toBeInTheDocument()
+    expect(details.open).toBe(false)
+    // Content still exists in the document even while collapsed.
+    expect(within(methodology).getByText('county_percentile_rank_average')).toBeInTheDocument()
+
+    fireEvent.click(summary)
+    expect(details.open).toBe(true)
+  })
+
+  it('provenance/sources is available but collapsed by default, and can be expanded', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    const sources = await screen.findByRole('region', { name: /sources/i })
+
+    const summary = within(sources).getByText('View sources')
+    const details = summary.closest('details') as HTMLDetailsElement
+    expect(details).toBeInTheDocument()
+    expect(details.open).toBe(false)
+    expect(within(sources).getByText('Primary Care HPSA')).toBeInTheDocument()
+
+    fireEvent.click(summary)
+    expect(details.open).toBe(true)
+  })
+
+  it('supporting evidence remains available per dimension alongside the redesign', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    expect(screen.getAllByText('Supporting evidence')).toHaveLength(4)
+  })
+
+  it('does not render a bare "0" for a small non-zero experimental composite value', async () => {
+    stubApi({
+      counties: makeCounties(['01001']),
+      explorer: (fips) => {
+        const payload = makeExplorer(fips)
+        return {
+          ...payload,
+          experimental_composite: {
+            ...payload.experimental_composite,
+            composite_value: 0.45,
+          },
+        }
+      },
+    })
+    renderApp(['/counties/01001'])
+    const composite = await screen.findByRole('region', {
+      name: /experimental composite/i,
+    })
+
+    expect(within(composite).queryByText('0')).toBeNull()
+    expect(within(composite).getByText('0.5')).toBeInTheDocument()
+  })
+
+  it('still renders a genuine zero composite as "0" (distinct from null/missing)', async () => {
+    stubApi({
+      counties: makeCounties(['01001']),
+      explorer: (fips) => {
+        const payload = makeExplorer(fips)
+        return {
+          ...payload,
+          experimental_composite: {
+            ...payload.experimental_composite,
+            composite_value: 0,
+          },
+        }
+      },
+    })
+    renderApp(['/counties/01001'])
+    const composite = await screen.findByRole('region', {
+      name: /experimental composite/i,
+    })
+
+    expect(within(composite).getByText('0')).toBeInTheDocument()
+    expect(within(composite).queryByText(/not available/i)).toBeNull()
+  })
+
+  it('preserves loading/error/not-found behavior alongside the redesign', async () => {
+    stubApi({ counties: makeCounties(['01001']), explorer: () => 503 })
+    renderApp(['/counties/01001'])
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/could not be loaded/i)
+    expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
   })
 })

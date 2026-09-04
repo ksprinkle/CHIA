@@ -11,7 +11,7 @@ import { SupportingEvidence } from '../components/SupportingEvidence'
 import { useCountyDirectory } from '../lib/countyDirectory'
 import { DIMENSION_ORDER } from '../lib/dimensions'
 import { CountyExplorerProvider, useCountyExplorer } from '../lib/countyExplorer'
-import type { DimensionProfile } from '../lib/types'
+import type { AccessProfile, DimensionProfile } from '../lib/types'
 
 const FIVE_DIGIT_FIPS = /^\d{5}$/
 
@@ -42,15 +42,84 @@ function formatCompleteness(status: string | null): string {
   return status.charAt(0).toUpperCase() + status.slice(1)
 }
 
-/**
- * Presentation-only rounding of an API-provided percentile score to the nearest
- * whole number (approved decision D4). The underlying value is never
- * recalculated or re-derived. Primary measures are not rounded: the API does
- * not define a display precision for them, so their `raw_value` is rendered as
- * provided.
- */
 function formatScore(score: number): string {
   return String(Math.round(score))
+}
+
+/**
+ * CE-E04 geographic breadcrumb (governing specification section 6.2):
+ * `United States → {State} → {County}`. `stateFips` comes from the canonical
+ * county directory record already resolved by `CountyPage` before rendering
+ * the profile (the Explorer payload's own `county` block has no
+ * `state_fips` field) -- no new API data and no type change was needed.
+ */
+function Breadcrumb({
+  stateFips,
+  stateName,
+  countyName,
+}: {
+  stateFips: string
+  stateName: string
+  countyName: string
+}) {
+  return (
+    <nav className="county-profile__breadcrumb" aria-label="Breadcrumb">
+      <ol className="breadcrumb__list">
+        <li className="breadcrumb__item">
+          <Link to="/">United States</Link>
+        </li>
+        <li className="breadcrumb__item">
+          <Link to={`/states/${stateFips}`}>{stateName}</Link>
+        </li>
+        <li className="breadcrumb__item" aria-current="page">
+          {countyName}
+        </li>
+      </ol>
+    </nav>
+  )
+}
+
+/**
+ * CE-E04 healthcare access snapshot (governing specification section 6.3):
+ * a compact, scannable summary of the four dimensions using the existing
+ * scores/values -- large value, short label, no chart, no new calculation.
+ * Distinguishes percentile-based dimensions from MUA/P's geographic-coverage
+ * value via a short unit qualifier rather than a full sentence.
+ */
+function SnapshotItem({ dimension }: { dimension: DimensionProfile }) {
+  const { dimension_name: dimensionName, available, score, normalized } = dimension
+  const hasScore = available && score !== null
+
+  return (
+    <li className="snapshot__item">
+      <span className="snapshot__name">{dimensionName}</span>
+      {hasScore ? (
+        <span className="snapshot__value">
+          {formatScore(score)}
+          <span className="snapshot__unit">
+            {normalized ? 'percentile' : '% coverage'}
+          </span>
+        </span>
+      ) : (
+        <span className="snapshot__value snapshot__value--unavailable">
+          Not available
+        </span>
+      )}
+    </li>
+  )
+}
+
+function Snapshot({ accessProfile }: { accessProfile: AccessProfile }) {
+  return (
+    <section className="snapshot" aria-labelledby="snapshot-heading">
+      <h2 id="snapshot-heading">Healthcare access snapshot</h2>
+      <ul className="snapshot__list">
+        {DIMENSION_ORDER.map((key) => (
+          <SnapshotItem key={key} dimension={accessProfile[key]} />
+        ))}
+      </ul>
+    </section>
+  )
 }
 
 function DimensionCard({ dimension }: { dimension: DimensionProfile }) {
@@ -125,7 +194,7 @@ function DimensionCard({ dimension }: { dimension: DimensionProfile }) {
   )
 }
 
-function CountyProfile() {
+function CountyProfile({ stateFips }: { stateFips: string }) {
   const explorer = useCountyExplorer()
 
   if (explorer.status === 'loading') {
@@ -168,6 +237,11 @@ function CountyProfile() {
   return (
     <section className="county-profile" aria-labelledby="county-profile-heading">
       <header className="county-profile__header">
+        <Breadcrumb
+          stateFips={stateFips}
+          stateName={county.state_name}
+          countyName={county.county_name}
+        />
         <h1 id="county-profile-heading">{county.county_name}</h1>
         <p className="county-profile__state">
           {formatState(county.state_name, county.state_abbr)}
@@ -187,6 +261,8 @@ function CountyProfile() {
           </div>
         </dl>
       </header>
+
+      <Snapshot accessProfile={accessProfile} />
 
       <section className="dimensions" aria-labelledby="dimensions-heading">
         <h2 id="dimensions-heading">Access dimensions</h2>
@@ -212,16 +288,17 @@ function CountyProfile() {
 }
 
 /**
- * County route.
+ * County route (`/counties/:countyFips`).
  *
  * Validates the `:countyFips` URL parameter (CE-C02 rules), then renders the
- * assembled Explorer read model for a valid known county from the single
- * shared `useCountyExplorer` payload: the county profile header and the four
- * access dimensions (CE-C03); per-dimension supporting evidence, the
- * experimental composite, methodology, and provenance (CE-C04); and
- * deterministic, application-generated interpretation (CE-C05). Loading,
- * error, not-found, and stale-data handling are unchanged from CE-C03/C04 --
- * CE-C05 introduces no new provider state.
+ * assembled Explorer read model for a valid known county: the CE-E04 visual
+ * profile (breadcrumb, header, healthcare access snapshot, the four access
+ * dimensions with per-dimension evidence, "What Stands Out?" interpretation,
+ * experimental composite, and methodology/provenance behind collapsed
+ * disclosures). Loading, error, and not-found handling are unchanged from
+ * CE-C03/C04. `state_fips` for the breadcrumb comes from the canonical
+ * county directory record resolved here (`County`, not the Explorer
+ * payload's `CountyBlock`, which has no `state_fips` field).
  */
 export function CountyPage() {
   const { countyFips = '' } = useParams<{ countyFips: string }>()
@@ -270,7 +347,7 @@ export function CountyPage() {
 
   return (
     <CountyExplorerProvider countyFips={countyFips}>
-      <CountyProfile />
+      <CountyProfile stateFips={county.state_fips} />
     </CountyExplorerProvider>
   )
 }
