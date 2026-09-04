@@ -69,8 +69,93 @@ export const STUB_US_STATES_TOPOJSON = {
   },
 }
 
+/**
+ * CE-E03: minimal, valid per-state county TopoJSON fixtures standing in for
+ * the real committed `frontend/public/geo/counties/<state_fips>.topojson`
+ * assets, keyed by state FIPS. Matches {@link makeMultiStateCounties}'s
+ * `01001`/`01003` (Alabama) and `06075` (California) so map/selector
+ * interaction tests don't depend on the real ~1.9 MB asset set.
+ */
+export const STUB_STATE_COUNTIES_TOPOJSON: Record<string, unknown> = {
+  '01': {
+    type: 'Topology',
+    arcs: [
+      [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+        [0, 0],
+      ],
+      [
+        [2, 0],
+        [3, 0],
+        [3, 1],
+        [2, 1],
+        [2, 0],
+      ],
+    ],
+    objects: {
+      counties: {
+        type: 'GeometryCollection',
+        geometries: [
+          { type: 'Polygon', id: '01001', properties: { NAME: 'Autauga' }, arcs: [[0]] },
+          { type: 'Polygon', id: '01003', properties: { NAME: 'Baldwin' }, arcs: [[1]] },
+        ],
+      },
+    },
+  },
+  '06': {
+    type: 'Topology',
+    arcs: [
+      [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+        [0, 0],
+      ],
+    ],
+    objects: {
+      counties: {
+        type: 'GeometryCollection',
+        geometries: [
+          {
+            type: 'Polygon',
+            id: '06075',
+            properties: { NAME: 'San Francisco' },
+            arcs: [[0]],
+          },
+        ],
+      },
+    },
+  },
+}
+
+const EMPTY_COUNTY_TOPOJSON = {
+  type: 'Topology',
+  arcs: [],
+  objects: { counties: { type: 'GeometryCollection', geometries: [] } },
+}
+
 function isGeographyRequest(url: string): boolean {
   return url.includes('/geo/')
+}
+
+/**
+ * Resolve a `/geo/...` request to the correct stub: the national states
+ * fixture for `us-states.topojson`, or the matching per-state county
+ * fixture (by state FIPS) for `counties/<state_fips>.topojson`. An unknown
+ * state FIPS resolves to a valid-but-empty topology rather than failing the
+ * request, mirroring how a real, unmatched state would behave.
+ */
+function geographyResponseFor(url: string): Promise<Response> {
+  const countyMatch = url.match(/\/geo\/counties\/(\d{2})\.topojson/)
+  if (countyMatch) {
+    const stateFips = countyMatch[1]
+    return okJson(STUB_STATE_COUNTIES_TOPOJSON[stateFips] ?? EMPTY_COUNTY_TOPOJSON)
+  }
+  return okJson(STUB_US_STATES_TOPOJSON)
 }
 
 /**
@@ -94,7 +179,7 @@ export function stubCountiesFetch(payload: CountyListResponse | Error | FetchImp
   } else {
     impl = (...args: unknown[]) => {
       const url = String(args[0])
-      if (isGeographyRequest(url)) return okJson(STUB_US_STATES_TOPOJSON)
+      if (isGeographyRequest(url)) return geographyResponseFor(url)
       if (url.includes('/explorer')) return errStatus(404)
       return okJson(payload)
     }
@@ -114,7 +199,7 @@ interface ApiStub {
 export function stubApi(stub: ApiStub = {}) {
   const impl: FetchImpl = (...args: unknown[]) => {
     const url = String(args[0])
-    if (isGeographyRequest(url)) return okJson(STUB_US_STATES_TOPOJSON)
+    if (isGeographyRequest(url)) return geographyResponseFor(url)
     const explorerFips = url.match(/\/counties\/(\d{5})\/explorer/)?.[1]
     if (explorerFips !== undefined) {
       const result = stub.explorer ? stub.explorer(explorerFips) : 404

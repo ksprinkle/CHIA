@@ -1,9 +1,12 @@
 import { Link, useParams } from 'react-router-dom'
 
+import { CountySelectForState } from '../components/CountySelectForState'
 import { ErrorState } from '../components/ErrorState'
 import { Loading } from '../components/Loading'
 import { NotFound } from '../components/NotFound'
+import { StateCountyMap } from '../components/StateCountyMap'
 import { useCountyDirectory } from '../lib/countyDirectory'
+import { deriveCountiesForState } from '../lib/counties'
 import { deriveStates } from '../lib/states'
 
 const TWO_DIGIT_FIPS = /^\d{2}$/
@@ -17,17 +20,20 @@ function BackToUnitedStates() {
 }
 
 /**
- * CE-E02 state route (`/states/:stateFips`) -- decision (b) from the CE-E02
+ * State route (`/states/:stateFips`) -- decision (b) from the CE-E02
  * approval: selecting a state navigates here rather than merely
  * acknowledging the selection in place.
  *
- * This is intentionally a minimal placeholder: it identifies the selected
- * state and explicitly defers the county-level map to CE-E03. It reuses the
- * same `deriveStates` derivation as `UsStateMap` / `StateSelect`
- * (`lib/states.ts`) -- there is no separate state lookup. The existing
- * global county selector (rendered in `Layout`) remains available on this
- * route as the way to actually reach a county profile until CE-E03 adds the
- * state/county map.
+ * CE-E02 established FIPS validation, state resolution (`deriveStates`,
+ * `lib/states.ts`), and loading/error/not-found handling, all unchanged
+ * here. CE-E03 replaces the former placeholder paragraph with the county
+ * map (`StateCountyMap`) and the accessible, state-scoped county selector
+ * (`CountySelectForState`). Both consume the same
+ * `deriveCountiesForState(directory.counties, stateFips)` call
+ * (`lib/counties.ts`) -- there is no second, independently defined county
+ * list. Selecting a county through either control navigates to the existing
+ * `/counties/:countyFips` route, unchanged. The existing global county
+ * selector (rendered in `Layout`) remains available on this route too.
  */
 export function StatePage() {
   const { stateFips = '' } = useParams<{ stateFips: string }>()
@@ -74,16 +80,15 @@ export function StatePage() {
     )
   }
 
+  const counties = deriveCountiesForState(directory.counties, stateFips)
+
   return (
     <section className="state-page" aria-labelledby="state-page-heading">
       <BackToUnitedStates />
       <h1 id="state-page-heading">{state.state_name}</h1>
       <p className="county-page__fips">FIPS {state.state_fips}</p>
-      <p className="state-page__placeholder">
-        County-level exploration for {state.state_name} is not yet available in
-        this view. Use the county selector above to open a specific county
-        profile directly.
-      </p>
+      <StateCountyMap stateFips={state.state_fips} counties={counties} />
+      <CountySelectForState counties={counties} stateName={state.state_name} />
     </section>
   )
 }

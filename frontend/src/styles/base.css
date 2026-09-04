@@ -460,13 +460,55 @@ code {
   color: inherit;
 }
 
-/* CE-E02 state placeholder page (/states/:stateFips) */
+/* State page (/states/:stateFips) */
 .state-page__back {
   margin-bottom: var(--space-3);
 }
 
-.state-page__placeholder {
-  color: var(--color-muted);
+/* CE-E03 state-level county map */
+.state-county-map {
+  margin: var(--space-4) 0;
+  max-width: 100%;
+}
+
+.state-county-map__svg {
+  width: 100%;
+  height: auto;
+}
+
+.state-county-map__county {
+  fill: var(--color-surface);
+  stroke: var(--color-border);
+  stroke-width: 0.5;
+  cursor: pointer;
+}
+
+.state-county-map__county:hover,
+.state-county-map__county:focus-visible {
+  fill: var(--color-focus);
+  fill-opacity: 0.2;
+}
+
+/* CE-E03 accessible, state-scoped county selector (mirrors .state-select) */
+.county-select-for-state {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 24rem;
+  margin-top: var(--space-3);
+}
+
+.county-select-for-state__label {
+  font-weight: 600;
+}
+
+.county-select-for-state__control {
+  font: inherit;
+  padding: var(--space-2);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: inherit;
 }
 
 @media (max-width: 600px) {
@@ -483,6 +525,10 @@ code {
   }
 
   .state-select {
+    max-width: none;
+  }
+
+  .county-select-for-state {
     max-width: none;
   }
 }

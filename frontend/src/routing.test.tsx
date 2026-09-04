@@ -178,3 +178,60 @@ describe('CE-E02 U.S. map landing & state navigation', () => {
     ).toBeInTheDocument()
   })
 })
+
+describe('CE-E03 state county map & county navigation', () => {
+  it('the county map and the accessible county selector resolve the same county to the same URL', async () => {
+    stubCountiesFetch(makeMultiStateCounties())
+
+    // Map selection.
+    const mapRun = renderApp(['/states/01'])
+    const map = await screen.findByRole('group', { name: /county map/i })
+    const baldwinButton = await within(map).findByRole('button', {
+      name: /select baldwin county/i,
+    })
+    fireEvent.click(baldwinButton)
+    const mapDestination = mapRun.router.state.location.pathname
+    mapRun.unmount()
+
+    // Accessible-selector selection, from a fresh render.
+    const selectRun = renderApp(['/states/01'])
+    const select = await screen.findByRole('combobox', { name: /county in alabama/i })
+    fireEvent.change(select, { target: { value: '01003' } })
+    const selectDestination = selectRun.router.state.location.pathname
+
+    expect(mapDestination).toBe('/counties/01003')
+    expect(selectDestination).toBe('/counties/01003')
+    expect(mapDestination).toBe(selectDestination)
+  })
+
+  it('the state route still surfaces the existing global county selector alongside the new controls', async () => {
+    stubCountiesFetch(makeMultiStateCounties())
+    renderApp(['/states/01'])
+
+    await screen.findByRole('heading', { level: 1, name: /^alabama$/i })
+    expect(screen.getByRole('combobox', { name: /^county$/i })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('combobox', { name: /county in alabama/i }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: /county map/i })).toBeInTheDocument()
+  })
+
+  it('selecting a supported county from the state route reaches its existing County Profile route', async () => {
+    stubApi({
+      counties: makeMultiStateCounties(),
+      explorer: (fips) => makeExplorer(fips, { county: { county_name: `County ${fips}` } }),
+    })
+    const { router } = renderApp(['/states/01'])
+
+    const map = await screen.findByRole('group', { name: /county map/i })
+    const autaugaButton = await within(map).findByRole('button', {
+      name: /select autauga county/i,
+    })
+    fireEvent.click(autaugaButton)
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/counties/01001'))
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /county 01001/i }),
+    ).toBeInTheDocument()
+  })
+})

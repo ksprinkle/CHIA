@@ -7,7 +7,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('StatePage (CE-E02)', () => {
+describe('StatePage (CE-E02/CE-E03)', () => {
   it('shows a loading state before the county/state directory resolves', () => {
     stubCountiesFetch(() => new Promise<Response>(() => {}))
     renderApp(['/states/01'])
@@ -19,7 +19,7 @@ describe('StatePage (CE-E02)', () => {
     expect(screen.getByText(/loading states/i)).toBeInTheDocument()
   })
 
-  it('identifies the selected state and defers the county map to CE-E03', async () => {
+  it('identifies the selected state, preserving CE-E02 state identification', async () => {
     stubCountiesFetch(makeMultiStateCounties())
     renderApp(['/states/01'])
 
@@ -27,7 +27,25 @@ describe('StatePage (CE-E02)', () => {
       await screen.findByRole('heading', { level: 1, name: /^alabama$/i }),
     ).toBeInTheDocument()
     expect(screen.getByText(/fips 01/i)).toBeInTheDocument()
-    expect(screen.getByText(/not yet available in this view/i)).toBeInTheDocument()
+  })
+
+  it('preserves return-to-United-States navigation', async () => {
+    stubCountiesFetch(makeMultiStateCounties())
+    renderApp(['/states/01'])
+
+    await screen.findByRole('heading', { level: 1, name: /^alabama$/i })
+    expect(screen.getByRole('link', { name: /united states/i })).toHaveAttribute('href', '/')
+  })
+
+  it('CE-E03: renders the state county map and the accessible state-scoped county selector', async () => {
+    stubCountiesFetch(makeMultiStateCounties())
+    renderApp(['/states/01'])
+
+    await screen.findByRole('heading', { level: 1, name: /^alabama$/i })
+    expect(screen.getByRole('group', { name: /county map/i })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('combobox', { name: /county in alabama/i }),
+    ).toBeInTheDocument()
   })
 
   it('leaves the existing global county selector available on the state route', async () => {
@@ -35,7 +53,9 @@ describe('StatePage (CE-E02)', () => {
     renderApp(['/states/01'])
 
     await screen.findByRole('heading', { level: 1, name: /^alabama$/i })
-    expect(screen.getByRole('combobox', { name: /county/i })).toBeInTheDocument()
+    // Anchored: CE-E03 also adds "County in Alabama" on the same page, which
+    // would otherwise ambiguously match a loose /county/i query.
+    expect(screen.getByRole('combobox', { name: /^county$/i })).toBeInTheDocument()
   })
 
   it('renders NotFound for a malformed state FIPS', async () => {
