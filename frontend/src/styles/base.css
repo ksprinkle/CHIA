@@ -303,6 +303,48 @@ code {
   color: var(--color-muted);
 }
 
+/* CE-E05 decorative visual indicators (aria-hidden; text above is the
+   accessible value). Two distinct widget shapes -- a position marker for
+   percentile dimensions, a filled bar for MUA/P coverage -- so the two
+   measurement types are never visually conflated (section 7.4). */
+.percentile-indicator,
+.coverage-indicator {
+  margin-top: var(--space-2);
+  height: 0.625rem;
+}
+
+.percentile-indicator__track,
+.coverage-indicator__track {
+  position: relative;
+  height: 0.375rem;
+  background: var(--color-border);
+  border-radius: 999px;
+}
+
+.percentile-indicator__marker {
+  position: absolute;
+  top: 50%;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-left: -0.375rem;
+  transform: translateY(-50%);
+  background: var(--color-focus);
+  border: 2px solid var(--color-bg);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--color-focus);
+}
+
+.coverage-indicator__track {
+  overflow: hidden;
+}
+
+.coverage-indicator__fill {
+  display: block;
+  height: 100%;
+  background: var(--color-muted);
+  border-radius: 999px;
+}
+
 .county-profile__meta,
 .dimension__measure {
   display: grid;

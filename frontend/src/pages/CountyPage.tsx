@@ -79,12 +79,68 @@ function Breadcrumb({
   )
 }
 
+function clampPercent(value: number): number {
+  return Math.min(100, Math.max(0, value))
+}
+
 /**
- * CE-E04 healthcare access snapshot (governing specification section 6.3):
- * a compact, scannable summary of the four dimensions using the existing
- * scores/values -- large value, short label, no chart, no new calculation.
- * Distinguishes percentile-based dimensions from MUA/P's geographic-coverage
- * value via a short unit qualifier rather than a full sentence.
+ * CE-E05 percentile position indicator (governing specification section
+ * 12.4/12.3): a marker on a fixed 0-100 track, communicating *relative
+ * position* rather than a filled proportion. A dot marker is always a
+ * fixed-size visible element regardless of position, so a genuine 0th
+ * percentile is still clearly visible at the track's start -- unlike a
+ * filled bar, it cannot visually "disappear" at zero.
+ *
+ * Purely decorative (`aria-hidden`): the adjacent visible text in
+ * `SnapshotItem` is the actual accessible value/label, unchanged from
+ * CE-E04 -- this marker never becomes the sole source of meaning.
+ */
+function PercentileIndicator({ value }: { value: number }) {
+  return (
+    <div className="percentile-indicator" aria-hidden="true">
+      <div className="percentile-indicator__track">
+        <span
+          className="percentile-indicator__marker"
+          style={{ left: `${clampPercent(value)}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+/**
+ * CE-E05 geographic-coverage indicator (governing specification section
+ * 12.5/7.4): a filled proportion bar -- a different visual metaphor from
+ * `PercentileIndicator`'s position marker -- so MUA/P is never presented on
+ * the same semantic scale as the three percentile dimensions. Purely
+ * decorative (`aria-hidden`); the adjacent visible text remains the actual
+ * accessible value, which is what guarantees a genuine 0% coverage value is
+ * never lost even though its fill is visually thin.
+ */
+function CoverageIndicator({ value }: { value: number }) {
+  return (
+    <div className="coverage-indicator" aria-hidden="true">
+      <div className="coverage-indicator__track">
+        <span
+          className="coverage-indicator__fill"
+          style={{ width: `${clampPercent(value)}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+/**
+ * CE-E04 healthcare access snapshot (governing specification section 6.3),
+ * upgraded in CE-E05 (section 14 "Visualization Layer") with an actual
+ * visual indicator per dimension. The visible text value/label from CE-E04
+ * is unchanged and remains the accessible source of truth; the indicator is
+ * a decorative supplement, never the only representation (section 12.12).
+ * Percentile dimensions use `PercentileIndicator` (position on a 0-100
+ * scale); MUA/P uses the visually distinct `CoverageIndicator` (filled
+ * proportion) -- never the same widget or scale (section 7.4). Neither
+ * indicator implies higher/lower is "better" or "worse": both are neutral
+ * position/proportion displays with a single, non-graded color.
  */
 function SnapshotItem({ dimension }: { dimension: DimensionProfile }) {
   const { dimension_name: dimensionName, available, score, normalized } = dimension
@@ -94,12 +150,19 @@ function SnapshotItem({ dimension }: { dimension: DimensionProfile }) {
     <li className="snapshot__item">
       <span className="snapshot__name">{dimensionName}</span>
       {hasScore ? (
-        <span className="snapshot__value">
-          {formatScore(score)}
-          <span className="snapshot__unit">
-            {normalized ? 'percentile' : '% coverage'}
+        <>
+          <span className="snapshot__value">
+            {formatScore(score)}
+            <span className="snapshot__unit">
+              {normalized ? 'percentile' : '% coverage'}
+            </span>
           </span>
-        </span>
+          {normalized ? (
+            <PercentileIndicator value={score} />
+          ) : (
+            <CoverageIndicator value={score} />
+          )}
+        </>
       ) : (
         <span className="snapshot__value snapshot__value--unavailable">
           Not available

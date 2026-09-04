@@ -1083,3 +1083,177 @@ describe('CountyPage (CE-E04 visual profile)', () => {
     expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
   })
 })
+
+describe('CountyPage (CE-E05 visualization layer)', () => {
+  it('renders a percentile position indicator for each of the three percentile dimensions', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const snapshot = screen.getByRole('region', { name: /healthcare access snapshot/i })
+    expect(snapshot.querySelectorAll('.percentile-indicator')).toHaveLength(3)
+  })
+
+  it('positions the percentile marker at 0% for a genuine 0th percentile, and it is not "Not available"', async () => {
+    stubApi({
+      counties: makeCounties(['01001']),
+      explorer: (fips) =>
+        makeExplorer(fips, {
+          dimensions: {
+            primary_care: {
+              available: true,
+              score: 0,
+              primary_measure: { normalized_value: 0 },
+            },
+          },
+        }),
+    })
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const snapshot = screen.getByRole('region', { name: /healthcare access snapshot/i })
+    const marker = snapshot.querySelector('.percentile-indicator__marker') as HTMLElement
+    expect(marker).toBeInTheDocument()
+    expect(marker.style.left).toBe('0%')
+    expect(within(snapshot).getByText('0')).toBeInTheDocument()
+    // Still 3 percentile indicators -- genuine zero is not treated as unavailable.
+    expect(snapshot.querySelectorAll('.percentile-indicator')).toHaveLength(3)
+  })
+
+  it('positions the percentile marker at 100% for a maximal percentile', async () => {
+    stubApi({
+      counties: makeCounties(['01001']),
+      explorer: (fips) =>
+        makeExplorer(fips, {
+          dimensions: {
+            dental: { score: 100, primary_measure: { normalized_value: 100 } },
+          },
+        }),
+    })
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const snapshot = screen.getByRole('region', { name: /healthcare access snapshot/i })
+    const markers = Array.from(
+      snapshot.querySelectorAll('.percentile-indicator__marker'),
+    ) as HTMLElement[]
+    expect(markers.some((marker) => marker.style.left === '100%')).toBe(true)
+  })
+
+  it('positions the percentile marker for a representative non-zero, non-boundary percentile', async () => {
+    stubValidCounty() // default fixture: primary_care 88, dental 29, mental_health 23
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const snapshot = screen.getByRole('region', { name: /healthcare access snapshot/i })
+    const markerPositions = Array.from(
+      snapshot.querySelectorAll('.percentile-indicator__marker'),
+    ).map((marker) => (marker as HTMLElement).style.left)
+    expect(markerPositions.sort()).toEqual(['23%', '29%', '88%'])
+  })
+
+  it('renders a distinct filled coverage indicator for MUA/P, never a percentile marker', async () => {
+    stubValidCounty() // default fixture: mua_p score 99, normalized: false
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const snapshot = screen.getByRole('region', { name: /healthcare access snapshot/i })
+    expect(snapshot.querySelectorAll('.coverage-indicator')).toHaveLength(1)
+    const fill = snapshot.querySelector('.coverage-indicator__fill') as HTMLElement
+    expect(fill.style.width).toBe('99%')
+    // MUA/P must never render as a percentile-position marker.
+    expect(snapshot.querySelectorAll('.percentile-indicator')).toHaveLength(3)
+  })
+
+  it('renders no indicator at all for an unavailable dimension, distinct from a genuine zero', async () => {
+    stubApi({
+      counties: makeCounties(['01001']),
+      explorer: (fips) =>
+        makeExplorer(fips, {
+          dimensions: {
+            dental: { available: false, score: null, score_status: null },
+          },
+        }),
+    })
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const snapshot = screen.getByRole('region', { name: /healthcare access snapshot/i })
+    // primary_care + mental_health remain percentile-indicated; dental (now
+    // unavailable) gets neither a percentile marker nor a coverage bar.
+    expect(snapshot.querySelectorAll('.percentile-indicator')).toHaveLength(2)
+    expect(snapshot.querySelectorAll('.coverage-indicator')).toHaveLength(1)
+    expect(within(snapshot).getByText('Not available')).toBeInTheDocument()
+  })
+
+  it('keeps the indicator decorative -- the numeric value and semantic label remain plain visible text', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const snapshot = screen.getByRole('region', { name: /healthcare access snapshot/i })
+    for (const indicator of snapshot.querySelectorAll('.percentile-indicator')) {
+      expect(indicator).toHaveAttribute('aria-hidden', 'true')
+    }
+    for (const indicator of snapshot.querySelectorAll('.coverage-indicator')) {
+      expect(indicator).toHaveAttribute('aria-hidden', 'true')
+    }
+    // The real values/labels remain ordinary visible text (unchanged from CE-E04).
+    expect(within(snapshot).getAllByText('percentile')).toHaveLength(3)
+    expect(within(snapshot).getByText('% coverage')).toBeInTheDocument()
+    expect(within(snapshot).getByText('88')).toBeInTheDocument()
+    expect(within(snapshot).getByText('99')).toBeInTheDocument()
+  })
+
+  it('does not rely on color alone: percentile and coverage use structurally different widgets', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const snapshot = screen.getByRole('region', { name: /healthcare access snapshot/i })
+    // Different DOM shapes (marker-on-track vs. filled bar) plus a distinct
+    // text unit ("percentile" vs. "% coverage") -- not merely a different
+    // color applied to an otherwise-identical widget.
+    expect(snapshot.querySelector('.percentile-indicator__marker')).toBeInTheDocument()
+    expect(snapshot.querySelector('.coverage-indicator__fill')).toBeInTheDocument()
+    expect(snapshot.querySelector('.coverage-indicator__marker')).toBeNull()
+    expect(snapshot.querySelector('.percentile-indicator__fill')).toBeNull()
+  })
+
+  it('does not introduce a chart-library dependency or measure-selection UI', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    // No canvas/svg-chart element and no measure selector anywhere on the page.
+    expect(document.querySelector('canvas')).toBeNull()
+    expect(screen.queryByRole('combobox', { name: /measure/i })).toBeNull()
+  })
+
+  it('keeps all CE-E04 content intact alongside the CE-E05 indicators', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    expect(
+      screen.getByRole('navigation', { name: /breadcrumb/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('region', { name: /healthcare access snapshot/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent),
+    ).toEqual([
+      'Primary Care Access',
+      'Dental Access',
+      'Mental Health Access',
+      'MUA/P Access',
+    ])
+    expect(screen.getAllByText('Supporting evidence')).toHaveLength(4)
+    expect(
+      screen.getByRole('region', { name: /experimental composite/i }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /methodology/i })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /sources/i })).toBeInTheDocument()
+  })
+})
