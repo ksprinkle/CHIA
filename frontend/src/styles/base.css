@@ -321,10 +321,20 @@ code {
 }
 
 /* CE-C04 experimental composite (secondary to the four dimensions) */
+.interpretation,
 .composite,
 .methodology,
 .provenance {
   margin-top: var(--space-5);
+}
+
+/* CE-C05 interpretation */
+.interpretation p {
+  margin: 0 0 var(--space-2);
+}
+
+.interpretation p:last-child {
+  margin-bottom: 0;
 }
 
 .composite__label {

@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 
 import { ErrorState } from '../components/ErrorState'
 import { ExperimentalComposite } from '../components/ExperimentalComposite'
+import { Interpretation } from '../components/Interpretation'
 import { Loading } from '../components/Loading'
 import { MethodologyPanel } from '../components/MethodologyPanel'
 import { NotFound } from '../components/NotFound'
@@ -198,6 +199,8 @@ function CountyProfile() {
         </ol>
       </section>
 
+      <Interpretation explorer={explorer.data} />
+
       <ExperimentalComposite composite={experimentalComposite} />
       <MethodologyPanel methodology={methodology} accessProfile={accessProfile} />
       <ProvenancePanel
@@ -214,9 +217,11 @@ function CountyProfile() {
  * Validates the `:countyFips` URL parameter (CE-C02 rules), then renders the
  * assembled Explorer read model for a valid known county from the single
  * shared `useCountyExplorer` payload: the county profile header and the four
- * access dimensions (CE-C03), plus per-dimension supporting evidence, the
- * experimental composite, methodology, and provenance (CE-C04). Per-county
- * interpretation and the standardized UI-state model are CE-C05.
+ * access dimensions (CE-C03); per-dimension supporting evidence, the
+ * experimental composite, methodology, and provenance (CE-C04); and
+ * deterministic, application-generated interpretation (CE-C05). Loading,
+ * error, not-found, and stale-data handling are unchanged from CE-C03/C04 --
+ * CE-C05 introduces no new provider state.
  */
 export function CountyPage() {
   const { countyFips = '' } = useParams<{ countyFips: string }>()

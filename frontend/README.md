@@ -1,4 +1,4 @@
-# CHIA County Explorer — Frontend (CE-C04)
+# CHIA County Explorer — Frontend (CE-C05)
 
 React + Vite + TypeScript UI for the CHIA County Explorer, built in vertical
 slices:
@@ -25,7 +25,19 @@ slices:
   normalization method, name, description, status, per-dimension
   `calculation_method` verbatim); and provenance (the API sources — name,
   publisher, dataset, reference period; no links, as all v0.1 URLs are null).
-  Per-county interpretation is CE-C05.
+- **CE-C05** — interpretation, placed after the four dimensions and before the
+  CE-C04 composite. Deterministic, application-generated descriptive text
+  derived from the same shared Explorer payload (no new field, no second
+  request): the highest-/lowest-scoring dimension(s) (all tied dimensions named
+  jointly), the score gap between them, how many dimensions have an available
+  score, and whether the experimental composite is available (naming any
+  missing dimensions verbatim). MUA/P participates in the comparison but is
+  never called a percentile — a factual qualifier is added whenever it is
+  named. No cross-county comparison, no score thresholds/bands, and no
+  individual-level, clinical, causal, predictive, or evaluative language
+  (enforced by a forbidden-language test). With fewer than two available
+  dimension scores, a neutral "not enough data" sentence replaces the
+  comparison. CE-C04's sections are unchanged and keep their existing order.
 
 No client-side analytical calculation: scores, normalization, and the composite
 are rendered exactly as returned by the API.
@@ -74,6 +86,7 @@ frontend/
       types.ts          # mirrors of CE-B01 / CE-B02 response contracts
       apiClient.ts      # listCounties(), getCountyExplorer()
       dimensions.ts     # canonical dimension order (access_profile key order)
+      interpretation.ts # pure deterministic interpretation derivation (CE-C05)
       countyDirectory.tsx  # county-list context (CE-C02)
       countyExplorer.tsx   # Explorer read-model context, keyed to :countyFips (CE-C03)
     components/
@@ -86,9 +99,10 @@ frontend/
       ExperimentalComposite.tsx # composite section (CE-C04)
       MethodologyPanel.tsx      # methodology section (CE-C04)
       ProvenancePanel.tsx       # sources section (CE-C04)
+      Interpretation.tsx        # interpretation section (CE-C05)
     pages/
       HomePage.tsx
-      CountyPage.tsx     # FIPS validation + profile + dimensions + evidence/composite/methodology/provenance
+      CountyPage.tsx     # FIPS validation + profile + dimensions + interpretation + evidence/composite/methodology/provenance
     styles/base.css      # reset + neutral tokens + focus + responsive container
     test/
       setup.ts

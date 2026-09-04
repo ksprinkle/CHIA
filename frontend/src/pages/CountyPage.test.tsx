@@ -9,19 +9,32 @@ import {
 } from '../test/harness'
 
 /**
- * Content that belongs to CE-C05 (per-county interpretation) or CE-C06
- * (accessibility/responsive hardening), not to CE-C03/CE-C04.
- *
- * CE-C04 legitimately renders supporting evidence, the experimental composite,
- * methodology, and provenance, so those patterns were removed from this list
- * when CE-C04 landed (disclosed locked-C03-file test-maintenance).
+ * Forbidden evaluative / comparative / causal language for CE-C05
+ * interpretation (governing specification section 14 boundary, approved D6).
+ * "high"/"low" are checked as bare words only -- "highest-scoring" and
+ * "lowest-scoring" are the approved, required phrasing and must not trip
+ * these patterns (a `\b`-bounded match on "high"/"low" does not match inside
+ * "highest"/"lowest").
  */
-const LATER_SLICE_LEAKAGE = [
-  /interpretation/i,
-  /compared (?:to|with)/i,
-  /relative to the other dimensions/i,
-  /\b(highest|lowest)\b/i,
-  /this county(?:'s)? (?:burden|score)/i,
+const FORBIDDEN_INTERPRETATION_LANGUAGE = [
+  /\bstrongest\b/i,
+  /\bweakest\b/i,
+  /\bbest\b/i,
+  /\bworst\b/i,
+  /\bpoor\b/i,
+  /\bgood\b/i,
+  /\bhigh\b/i,
+  /\blow\b/i,
+  /\bconcerning\b/i,
+  /\bvulnerable\b/i,
+  /unusually (?:high|low)/i,
+  /\bquartile/i,
+  /\bband(?:s|ing)?\b/i,
+  /compared? (?:to|with) (?:other|the) counties/i,
+  /\brank(?:s|ed|ing)? (?:relative to|among|against) (?:other )?counties/i,
+  /\brisk\b/i,
+  /\bpredict/i,
+  /\brecommend/i,
 ]
 
 afterEach(() => {
@@ -280,15 +293,15 @@ describe('CountyPage (CE-C03 county profile)', () => {
     )
   })
 
-  it('does not render CE-C05 interpretation or CE-C06 dialog content', async () => {
+  it('does not render CE-C06 dialog content', async () => {
     stubValidCounty()
     renderApp(['/counties/01001'])
     await screen.findByRole('heading', { level: 1 })
 
-    for (const pattern of LATER_SLICE_LEAKAGE) {
-      expect(screen.queryByText(pattern)).toBeNull()
-    }
-    // CE-C04 disclosures are native <details>, never a modal/dialog widget.
+    // CE-C05's interpretation section legitimately renders "Interpretation",
+    // "highest"/"lowest", etc. (see the CE-C05 describe block below for the
+    // precise forbidden-language boundary). CE-C04 disclosures are native
+    // <details>, never a modal/dialog widget -- that boundary still applies.
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
@@ -597,5 +610,265 @@ describe('CountyPage (CE-C04 evidence / methodology / composite)', () => {
       screen.getByText(/not percentile-normalized in v0\.1/i),
     ).toBeInTheDocument()
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+  })
+})
+
+describe('CountyPage (CE-C05 interpretation)', () => {
+  it('renders completeness, highest/lowest, gap, and composite-availability sentences', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    const interpretation = await screen.findByRole('region', {
+      name: /interpretation/i,
+    })
+
+    // Default fixture: primary_care 88, dental 29, mental_health 23, mua_p 99.
+    expect(
+      within(interpretation).getByText(/4 of 4 dimensions/i),
+    ).toBeInTheDocument()
+    expect(
+      within(interpretation).getByText(/MUA\/P Access.*highest-scoring/i),
+    ).toBeInTheDocument()
+    expect(
+      within(interpretation).getByText(/Mental Health Access.*lowest-scoring/i),
+    ).toBeInTheDocument()
+    expect(
+      within(interpretation).getByText(/difference between.*is 76 points/i),
+    ).toBeInTheDocument()
+    expect(
+      within(interpretation).getByText(
+        /experimental composite is available for this county/i,
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('includes MUA/P in the comparison with a non-percentile qualifier, never calling it a percentile', async () => {
+    stubApi({
+      counties: makeCounties(['01001']),
+      explorer: (fips) =>
+        makeExplorer(fips, {
+          dimensions: {
+            primary_care: { score: 10 },
+            dental: { score: 20 },
+            mental_health: { score: 30 },
+            mua_p: { score: 95, normalized: false },
+          },
+        }),
+    })
+    renderApp(['/counties/01001'])
+    const interpretation = await screen.findByRole('region', {
+      name: /interpretation/i,
+    })
+
+    expect(
+      within(interpretation).getByText(/MUA\/P Access.*highest-scoring/i),
+    ).toBeInTheDocument()
+    expect(
+      within(interpretation).getByText(
+        /MUA\/P Access.s score is a coverage value, not a percentile rank/i,
+      ),
+    ).toBeInTheDocument()
+    // The only mention of "percentile" is the qualifier's negation above --
+    // MUA/P's score is never asserted to *be* a percentile.
+    expect(
+      within(interpretation).queryByText(/MUA\/P Access.s (?:score )?is a percentile/i),
+    ).toBeNull()
+  })
+
+  it('names all dimensions tied for the highest score', async () => {
+    stubApi({
+      counties: makeCounties(['01001']),
+      explorer: (fips) =>
+        makeExplorer(fips, {
+          dimensions: {
+            primary_care: { score: 80 },
+            dental: { score: 80 },
+            mental_health: { score: 20 },
+            mua_p: { score: 50, normalized: false },
+          },
+        }),
+    })
+    renderApp(['/counties/01001'])
+    const interpretation = await screen.findByRole('region', {
+      name: /interpretation/i,
+    })
+
+    expect(
+      within(interpretation).getByText(
+        /Primary Care Access and Dental Access are jointly this county's highest-scoring dimensions/i,
+      ),
+    ).toBeInTheDocument()
+    expect(
+      within(interpretation).getByText(/Mental Health Access.*lowest-scoring/i),
+    ).toBeInTheDocument()
+  })
+
+  it('names all dimensions tied for the lowest score', async () => {
+    stubApi({
+      counties: makeCounties(['01001']),
+      explorer: (fips) =>
+        makeExplorer(fips, {
+          dimensions: {
+            primary_care: { score: 90 },
+            dental: { score: 10 },
+            mental_health: { score: 10 },
+            mua_p: { score: 50, normalized: false },
+          },
+        }),
+    })
+    renderApp(['/counties/01001'])
+    const interpretation = await screen.findByRole('region', {
+      name: /interpretation/i,
+    })
+
+    expect(
+      within(interpretation).getByText(
+        /Dental Access and Mental Health Access are jointly this county's lowest-scoring dimensions/i,
+      ),
+    ).toBeInTheDocument()
+    expect(
+      within(interpretation).getByText(/Primary Care Access.*highest-scoring/i),
+    ).toBeInTheDocument()
+  })
+
+  it('shows the insufficient-data fallback with fewer than two available scores', async () => {
+    stubApi({
+      counties: makeCounties(['01001']),
+      explorer: (fips) =>
+        makeExplorer(fips, {
+          dimensions: {
+            dental: { available: false, score: null },
+            mental_health: { available: false, score: null },
+            mua_p: { available: false, score: null },
+          },
+        }),
+    })
+    renderApp(['/counties/01001'])
+    const interpretation = await screen.findByRole('region', {
+      name: /interpretation/i,
+    })
+
+    expect(
+      within(interpretation).getByText(/1 of 4 dimensions/i),
+    ).toBeInTheDocument()
+    expect(
+      within(interpretation).getByText(
+        /not enough available dimension data to compare across dimensions for this county/i,
+      ),
+    ).toBeInTheDocument()
+    expect(
+      within(interpretation).queryByText(/highest-scoring/i),
+    ).toBeNull()
+    expect(within(interpretation).queryByText(/lowest-scoring/i)).toBeNull()
+    expect(
+      within(interpretation).queryByText(/difference between/i),
+    ).toBeNull()
+  })
+
+  it('shows composite unavailability naming the API missing_dimensions verbatim', async () => {
+    stubApi({
+      counties: makeCounties(['01001']),
+      explorer: (fips) => {
+        const payload = makeExplorer(fips)
+        return {
+          ...payload,
+          experimental_composite: {
+            ...payload.experimental_composite,
+            composite_value: null,
+            missing_dimensions: ['DENTAL'],
+          },
+        }
+      },
+    })
+    renderApp(['/counties/01001'])
+    const interpretation = await screen.findByRole('region', {
+      name: /interpretation/i,
+    })
+
+    expect(
+      within(interpretation).getByText(
+        /experimental composite is not available because DENTAL is missing/i,
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('does not use forbidden evaluative, comparative, or causal language', async () => {
+    stubApi({
+      counties: makeCounties(['01001']),
+      explorer: (fips) =>
+        makeExplorer(fips, {
+          dimensions: {
+            primary_care: { score: 95 },
+            dental: { score: 95 },
+            mental_health: { score: 5 },
+            mua_p: { score: 5, normalized: false },
+          },
+        }),
+    })
+    renderApp(['/counties/01001'])
+    const interpretation = await screen.findByRole('region', {
+      name: /interpretation/i,
+    })
+    const text = interpretation.textContent ?? ''
+
+    for (const pattern of FORBIDDEN_INTERPRETATION_LANGUAGE) {
+      expect(text).not.toMatch(pattern)
+    }
+  })
+
+  it('places the interpretation section after the dimensions and before the composite', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const dimensions = screen.getByRole('region', { name: /access dimensions/i })
+    const interpretation = screen.getByRole('region', { name: /interpretation/i })
+    const composite = screen.getByRole('region', { name: /experimental composite/i })
+
+    expect(
+      dimensions.compareDocumentPosition(interpretation) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(
+      interpretation.compareDocumentPosition(composite) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('is a single labelled region with one h2', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    const interpretation = await screen.findByRole('region', {
+      name: /interpretation/i,
+    })
+
+    expect(
+      within(interpretation).getByRole('heading', { level: 2, name: /interpretation/i }),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('keeps CE-C03 and CE-C04 content intact alongside the interpretation section', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('region', { name: /interpretation/i })
+
+    // C03
+    expect(
+      screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent),
+    ).toEqual([
+      'Primary Care Access',
+      'Dental Access',
+      'Mental Health Access',
+      'MUA/P Access',
+    ])
+    // C04
+    expect(screen.getAllByText('Supporting evidence')).toHaveLength(4)
+    expect(
+      screen.getByRole('region', { name: /experimental composite/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('region', { name: /methodology/i }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /sources/i })).toBeInTheDocument()
   })
 })
