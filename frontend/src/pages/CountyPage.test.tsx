@@ -1257,3 +1257,215 @@ describe('CountyPage (CE-E05 visualization layer)', () => {
     expect(screen.getByRole('region', { name: /sources/i })).toBeInTheDocument()
   })
 })
+
+describe('CountyPage (CE-E06 measure exploration & drill-down)', () => {
+  const DIMENSION_NAMES = [
+    'Primary Care Access',
+    'Dental Access',
+    'Mental Health Access',
+    'MUA/P Access',
+  ]
+
+  function dimensionListItem(dimensionName: string): HTMLElement {
+    const heading = screen.getByRole('heading', { level: 3, name: dimensionName })
+    return heading.closest('li') as HTMLElement
+  }
+
+  function investigateDetails(dimensionName: string): HTMLDetailsElement {
+    const item = dimensionListItem(dimensionName)
+    const summary = within(item).getByText(`Investigate ${dimensionName}`)
+    return summary.closest('details') as HTMLDetailsElement
+  }
+
+  it('gives each dimension its own "Investigate {dimension name}" disclosure, collapsed by default', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    for (const name of DIMENSION_NAMES) {
+      const details = investigateDetails(name)
+      expect(details).toBeInTheDocument()
+      expect(details.open).toBe(false)
+    }
+  })
+
+  it('keeps dimension name, description, score, qualifier, and the CE-E05 indicator visible while the disclosure is closed', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const item = dimensionListItem('Primary Care Access')
+    expect(investigateDetails('Primary Care Access').open).toBe(false)
+
+    expect(
+      within(item).getByRole('heading', { level: 3, name: 'Primary Care Access' }),
+    ).toBeInTheDocument()
+    expect(within(item).getByText('Primary Care Access description.')).toBeInTheDocument()
+    expect(within(item).getByText('88', { selector: '.dimension__score-value' })).toBeInTheDocument()
+    expect(within(item).getByText('County percentile rank')).toBeInTheDocument()
+    expect(item.querySelector('.percentile-indicator')).toBeInTheDocument()
+  })
+
+  it("contains underlying/source-measure data within the dimension's own disclosure", async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const details = investigateDetails('Primary Care Access')
+    expect(within(details).getByText('Primary Care Access primary measure')).toBeInTheDocument()
+    expect(within(details).getByText('42.5 percent')).toBeInTheDocument()
+  })
+
+  it('associates supporting evidence with the correct dimension inside its own disclosure', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const dentalDetails = investigateDetails('Dental Access')
+    expect(within(dentalDetails).getByText('Dental HPSA Area-Weighted Score')).toBeInTheDocument()
+
+    const muaDetails = investigateDetails('MUA/P Access')
+    expect(within(muaDetails).getByText('MUA/P Mean Score')).toBeInTheDocument()
+    expect(within(dentalDetails).queryByText('MUA/P Mean Score')).toBeNull()
+  })
+
+  it('shows methodology scoped to that dimension only, not the page-level methodology block', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const details = investigateDetails('Primary Care Access')
+    expect(
+      within(details).getByText('Primary Care Access calculation method.'),
+    ).toBeInTheDocument()
+    expect(within(details).getByText('county_percentile_rank_average')).toBeInTheDocument()
+    expect(within(details).queryByText('Dental Access calculation method.')).toBeNull()
+    expect(within(details).queryByText('CHIA Access Profile v0.1')).toBeNull()
+  })
+
+  it('shows provenance/source scoped to that dimension only, not the full source list', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const details = investigateDetails('Dental Access')
+    expect(within(details).getByText('Dental HPSA')).toBeInTheDocument()
+    expect(within(details).getByText('Dental HPSA Spatial Coverage')).toBeInTheDocument()
+    expect(within(details).queryByText('Primary Care HPSA')).toBeNull()
+    expect(within(details).queryByText('MUA/P')).toBeNull()
+  })
+
+  it("opens one dimension's disclosure without opening the others (no accordion behavior)", async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const allDetails = DIMENSION_NAMES.map((name) => investigateDetails(name))
+    expect(allDetails.every((details) => details.open === false)).toBe(true)
+
+    fireEvent.click(within(dimensionListItem('Dental Access')).getByText('Investigate Dental Access'))
+
+    expect(allDetails[1].open).toBe(true)
+    expect(allDetails[0].open).toBe(false)
+    expect(allDetails[2].open).toBe(false)
+    expect(allDetails[3].open).toBe(false)
+  })
+
+  it('closes again on a second toggle, hiding the detailed analytical material', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const summary = within(dimensionListItem('Mental Health Access')).getByText(
+      'Investigate Mental Health Access',
+    )
+    const details = summary.closest('details') as HTMLDetailsElement
+    expect(details.open).toBe(false)
+    fireEvent.click(summary)
+    expect(details.open).toBe(true)
+    fireEvent.click(summary)
+    expect(details.open).toBe(false)
+  })
+
+  it('leaves the page-level Methodology and Provenance panels present and unchanged', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const methodology = screen.getByRole('region', { name: /methodology/i })
+    expect(within(methodology).getByText('CHIA Access Profile v0.1')).toBeInTheDocument()
+    for (const name of DIMENSION_NAMES) {
+      expect(within(methodology).getByText(`${name} calculation method.`)).toBeInTheDocument()
+    }
+
+    const sources = screen.getByRole('region', { name: /sources/i })
+    for (const name of ['Primary Care HPSA', 'Dental HPSA', 'Mental Health HPSA', 'MUA/P']) {
+      expect(within(sources).getByText(name)).toBeInTheDocument()
+    }
+  })
+
+  it("never mixes one dimension's methodology into another dimension's disclosure", async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const calcMethods = DIMENSION_NAMES.map((name) => `${name} calculation method.`)
+    const detailsList = DIMENSION_NAMES.map((name) => investigateDetails(name))
+
+    detailsList.forEach((details, index) => {
+      expect(within(details).getByText(calcMethods[index])).toBeInTheDocument()
+      calcMethods.forEach((otherMethod, otherIndex) => {
+        if (otherIndex !== index) {
+          expect(within(details).queryByText(otherMethod)).toBeNull()
+        }
+      })
+    })
+  })
+
+  it('preserves genuine-zero, missing, percentile, and MUA/P coverage semantics inside the disclosure', async () => {
+    stubApi({
+      counties: makeCounties(['01001']),
+      explorer: (fips) =>
+        makeExplorer(fips, {
+          dimensions: {
+            primary_care: {
+              available: true,
+              score: 0,
+              primary_measure: { normalized_value: 0 },
+            },
+            dental: { available: false, score: null, score_status: null },
+          },
+        }),
+    })
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const primaryCare = dimensionListItem('Primary Care Access')
+    expect(
+      within(primaryCare).getByText('0', { selector: '.dimension__score-value' }),
+    ).toBeInTheDocument()
+    expect(primaryCare.querySelector('.percentile-indicator__marker')).toBeInTheDocument()
+
+    const dental = dimensionListItem('Dental Access')
+    expect(within(dental).getByText('Not available')).toBeInTheDocument()
+    expect(dental.querySelector('.percentile-indicator')).toBeNull()
+    expect(dental.querySelector('.coverage-indicator')).toBeNull()
+
+    const mua = dimensionListItem('MUA/P Access')
+    expect(mua.querySelector('.coverage-indicator')).toBeInTheDocument()
+    expect(mua.querySelector('.percentile-indicator')).toBeNull()
+  })
+
+  it('keeps native <details>/<summary> semantics -- no dialog/modal, no ARIA misuse', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const summary = within(dimensionListItem('Primary Care Access')).getByText(
+      'Investigate Primary Care Access',
+    )
+    expect(summary.tagName).toBe('SUMMARY')
+    expect(summary.closest('details')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+})

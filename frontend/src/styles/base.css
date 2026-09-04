@@ -413,6 +413,19 @@ code {
   font-style: italic;
 }
 
+/* CE-E06 per-dimension drill-down (collapsed by default, matching
+   .evidence__summary): underlying data, evidence, methodology, and
+   provenance for one dimension sit behind this disclosure, so only the
+   Result (name, description, score, indicator) is visible by default. */
+.dimension__disclosure {
+  margin-top: var(--space-3);
+}
+
+.dimension__summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
 /* CE-C04 supporting evidence (subordinate to the primary measure) */
 .evidence {
   margin-top: var(--space-3);
@@ -444,6 +457,27 @@ code {
 }
 
 .evidence__name {
+  font-weight: 600;
+}
+
+/* CE-E06 dimension-scoped methodology / provenance (one source, one
+   dimension's own calculation method -- never the full page-level panel
+   content, which remains available separately in .methodology / .provenance
+   below). Grid/dt/dd rules are shared with those page-level panels. */
+.dimension-methodology,
+.dimension-provenance {
+  margin-top: var(--space-3);
+}
+
+.dimension-methodology__heading,
+.dimension-provenance__heading {
+  margin: 0 0 var(--space-1);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.dimension-provenance__name {
+  margin: 0 0 var(--space-1);
   font-weight: 600;
 }
 
@@ -502,7 +536,9 @@ code {
 }
 
 .methodology__meta,
-.provenance__meta {
+.provenance__meta,
+.dimension-methodology__meta,
+.dimension-provenance__meta {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
   gap: var(--space-1) var(--space-4);
@@ -511,13 +547,17 @@ code {
 
 .methodology__meta dt,
 .methodology__calc dt,
-.provenance__meta dt {
+.provenance__meta dt,
+.dimension-methodology__meta dt,
+.dimension-provenance__meta dt {
   font-weight: 600;
 }
 
 .methodology__meta dd,
 .methodology__calc dd,
-.provenance__meta dd {
+.provenance__meta dd,
+.dimension-methodology__meta dd,
+.dimension-provenance__meta dd {
   margin: 0;
 }
 

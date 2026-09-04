@@ -11,7 +11,7 @@ import { SupportingEvidence } from '../components/SupportingEvidence'
 import { useCountyDirectory } from '../lib/countyDirectory'
 import { DIMENSION_ORDER } from '../lib/dimensions'
 import { CountyExplorerProvider, useCountyExplorer } from '../lib/countyExplorer'
-import type { AccessProfile, DimensionProfile } from '../lib/types'
+import type { AccessProfile, DimensionProfile, SourceRef } from '../lib/types'
 
 const FIVE_DIGIT_FIPS = /^\d{5}$/
 
@@ -185,7 +185,107 @@ function Snapshot({ accessProfile }: { accessProfile: AccessProfile }) {
   )
 }
 
-function DimensionCard({ dimension }: { dimension: DimensionProfile }) {
+/**
+ * CE-E06 dimension-scoped methodology (governing specification section
+ * 6.10/8.6/13.11): shows only *this* dimension's own calculation method and
+ * normalization method -- never the full page-level `MethodologyBlock`,
+ * which remains intact and unchanged in `MethodologyPanel` as the
+ * comprehensive reference view. No new analytical content: both values are
+ * already persisted on `DimensionProfile`/`PrimaryMeasure`.
+ */
+function DimensionMethodology({
+  calculationMethod,
+  normalizationMethod,
+}: {
+  calculationMethod: string | null
+  normalizationMethod: string | null
+}) {
+  if (!calculationMethod && !normalizationMethod) return null
+
+  return (
+    <div className="dimension-methodology">
+      <h4 className="dimension-methodology__heading">Methodology</h4>
+      <dl className="dimension-methodology__meta">
+        {calculationMethod ? (
+          <div>
+            <dt>Calculation method</dt>
+            <dd>{calculationMethod}</dd>
+          </div>
+        ) : null}
+        {normalizationMethod ? (
+          <div>
+            <dt>Normalization method</dt>
+            <dd>{normalizationMethod}</dd>
+          </div>
+        ) : null}
+      </dl>
+    </div>
+  )
+}
+
+/**
+ * CE-E06 dimension-scoped provenance (governing specification section
+ * 6.11/8.7/13.11): shows only the single source that this dimension's
+ * `source_id` identifies -- never the full source list, which remains
+ * intact and unchanged in `ProvenancePanel` as the comprehensive reference
+ * view. The source lookup uses the existing `source_id` join, the same one
+ * `ProvenancePanel` already uses for its "Used by" column.
+ */
+function DimensionProvenance({ source }: { source: SourceRef | null }) {
+  if (!source) return null
+
+  return (
+    <div className="dimension-provenance">
+      <h4 className="dimension-provenance__heading">Provenance</h4>
+      <p className="dimension-provenance__name">{source.source_name}</p>
+      <dl className="dimension-provenance__meta">
+        {source.publisher ? (
+          <div>
+            <dt>Publisher</dt>
+            <dd>{source.publisher}</dd>
+          </div>
+        ) : null}
+        {source.dataset_name ? (
+          <div>
+            <dt>Dataset</dt>
+            <dd>{source.dataset_name}</dd>
+          </div>
+        ) : null}
+        {source.reference_period ? (
+          <div>
+            <dt>Reference period</dt>
+            <dd>{source.reference_period}</dd>
+          </div>
+        ) : null}
+      </dl>
+    </div>
+  )
+}
+
+/**
+ * CE-E06 dimension drill-down (governing specification section 6.7/8.3):
+ * `Result` (name, description, score, qualifier, CE-E05 visual indicator)
+ * remains visible by default; the analytical trail -- underlying/source
+ * data, Evidence, Methodology, Provenance -- sits behind one independent,
+ * per-dimension `<details>` (`Investigate {dimension name}`), so the
+ * initial profile does not expose all analytical detail simultaneously
+ * (section 8.2). Each dimension's disclosure opens/closes on its own; there
+ * is no accordion/exclusive-open behavior and no new state -- the native
+ * `<details>` element's own `open` attribute is the only state involved
+ * (section 13.4).
+ *
+ * The dimension's own `calculation_method` is shown once, in
+ * `DimensionMethodology` -- `SupportingEvidence` is passed `null` for its
+ * `calculationMethod` prop here so the same text is not duplicated inside
+ * the Evidence disclosure as well (section 12.9 avoiding overload).
+ */
+function DimensionCard({
+  dimension,
+  sources,
+}: {
+  dimension: DimensionProfile
+  sources: SourceRef[]
+}) {
   const {
     dimension_name: dimensionName,
     description,
@@ -195,8 +295,13 @@ function DimensionCard({ dimension }: { dimension: DimensionProfile }) {
     primary_measure: primaryMeasure,
     supporting_evidence: supportingEvidence,
     calculation_method: calculationMethod,
+    source_id: sourceId,
   } = dimension
   const hasScore = available && score !== null
+  const source =
+    sourceId === null
+      ? null
+      : (sources.find((candidate) => candidate.source_id === sourceId) ?? null)
 
   return (
     <li className="dimension">
@@ -220,39 +325,57 @@ function DimensionCard({ dimension }: { dimension: DimensionProfile }) {
         </p>
       )}
 
-      <dl className="dimension__measure">
-        <div>
-          <dt>Primary measure</dt>
-          <dd>{primaryMeasure.display_name}</dd>
-        </div>
-        <div>
-          <dt>Reported value</dt>
-          <dd>
-            {primaryMeasure.raw_value === null
-              ? 'Not reported'
-              : primaryMeasure.unit
-                ? `${primaryMeasure.raw_value} ${primaryMeasure.unit}`
-                : `${primaryMeasure.raw_value}`}
-          </dd>
-        </div>
-        {primaryMeasure.normalized_value !== null ? (
-          <div>
-            <dt>Percentile value</dt>
-            <dd>{formatScore(primaryMeasure.normalized_value)}</dd>
-          </div>
-        ) : null}
-        {primaryMeasure.quality_flag ? (
-          <div>
-            <dt>Data quality</dt>
-            <dd>{primaryMeasure.quality_flag}</dd>
-          </div>
-        ) : null}
-      </dl>
+      {hasScore ? (
+        normalized ? (
+          <PercentileIndicator value={score} />
+        ) : (
+          <CoverageIndicator value={score} />
+        )
+      ) : null}
 
-      <SupportingEvidence
-        items={supportingEvidence}
-        calculationMethod={calculationMethod}
-      />
+      <details className="dimension__disclosure">
+        <summary className="dimension__summary">
+          Investigate {dimensionName}
+        </summary>
+
+        <dl className="dimension__measure">
+          <div>
+            <dt>Primary measure</dt>
+            <dd>{primaryMeasure.display_name}</dd>
+          </div>
+          <div>
+            <dt>Reported value</dt>
+            <dd>
+              {primaryMeasure.raw_value === null
+                ? 'Not reported'
+                : primaryMeasure.unit
+                  ? `${primaryMeasure.raw_value} ${primaryMeasure.unit}`
+                  : `${primaryMeasure.raw_value}`}
+            </dd>
+          </div>
+          {primaryMeasure.normalized_value !== null ? (
+            <div>
+              <dt>Percentile value</dt>
+              <dd>{formatScore(primaryMeasure.normalized_value)}</dd>
+            </div>
+          ) : null}
+          {primaryMeasure.quality_flag ? (
+            <div>
+              <dt>Data quality</dt>
+              <dd>{primaryMeasure.quality_flag}</dd>
+            </div>
+          ) : null}
+        </dl>
+
+        <SupportingEvidence items={supportingEvidence} calculationMethod={null} />
+
+        <DimensionMethodology
+          calculationMethod={calculationMethod}
+          normalizationMethod={primaryMeasure.normalization_method}
+        />
+
+        <DimensionProvenance source={source} />
+      </details>
     </li>
   )
 }
@@ -333,7 +456,11 @@ function CountyProfile({ stateFips }: { stateFips: string }) {
         <p className="dimensions__caveat">{GEOGRAPHIC_COVERAGE_CAVEAT}</p>
         <ol className="dimensions__list">
           {DIMENSION_ORDER.map((key) => (
-            <DimensionCard key={key} dimension={accessProfile[key]} />
+            <DimensionCard
+              key={key}
+              dimension={accessProfile[key]}
+              sources={provenance.sources}
+            />
           ))}
         </ol>
       </section>
