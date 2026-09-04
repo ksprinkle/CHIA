@@ -15,6 +15,12 @@
   --color-surface: #f4f4f4;
   --color-focus: #10428a;
   --color-error-border: #8a1c1c;
+  /* CE-C06: dedicated border color for interactive controls (<select>,
+     <button>). --color-border (~1.75:1 on white) is decorative-only
+     elsewhere and does not meet the WCAG 1.4.11 non-text 3:1 minimum for a
+     control's boundary; this reuses --color-muted's value (~7.6:1 on white,
+     ~6.9:1 on --color-surface), which clears it with margin. */
+  --color-control-border: var(--color-muted);
 
   --space-1: 4px;
   --space-2: 8px;
@@ -102,7 +108,10 @@ body {
   padding: var(--space-5) var(--space-3);
 }
 
-.app-main:focus {
+/* CE-C06: suppress only non-keyboard-visible focus. Keyboard-visible focus --
+   in particular, landing here via the skip link -- must keep the global
+   :focus-visible outline defined above. */
+.app-main:focus:not(:focus-visible) {
   outline: none;
 }
 
@@ -147,7 +156,7 @@ body {
 .button {
   font: inherit;
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-control-border);
   border-radius: var(--radius);
   background: var(--color-bg);
   color: inherit;
@@ -182,7 +191,7 @@ code {
 .county-selector__control {
   font: inherit;
   padding: var(--space-2);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-control-border);
   border-radius: var(--radius);
   background: var(--color-bg);
   color: inherit;

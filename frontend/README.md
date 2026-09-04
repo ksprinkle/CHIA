@@ -1,4 +1,4 @@
-# CHIA County Explorer — Frontend (CE-C05)
+# CHIA County Explorer — Frontend (CE-C06)
 
 React + Vite + TypeScript UI for the CHIA County Explorer, built in vertical
 slices:
@@ -38,6 +38,25 @@ slices:
   (enforced by a forbidden-language test). With fewer than two available
   dimension scores, a neutral "not enough data" sentence replaces the
   comparison. CE-C04's sections are unchanged and keep their existing order.
+- **CE-C06** — accessibility and responsive validation. No new UI, no new
+  component: two narrowly-scoped fixes plus explicit keyboard-interaction
+  tests over the existing CE-C01–CE-C05 markup. (1) The skip link's landing
+  target (`<main tabIndex={-1}>`) now keeps a visible focus outline when
+  reached via keyboard/skip-link activation — the prior blanket
+  `.app-main:focus { outline: none }` is scoped to
+  `:focus:not(:focus-visible)`, so only a non-keyboard focus is suppressed.
+  (2) The `<select>` and `<button>` controls use a dedicated
+  `--color-control-border` token (reusing `--color-muted`, ~7.6:1 on
+  `--color-bg` / ~6.9:1 on `--color-surface`) instead of the decorative
+  `--color-border` (~1.75:1), clearing the WCAG 1.4.11 3:1 non-text minimum
+  for an interactive control's boundary; no other border in the app is
+  affected. `src/accessibility.test.tsx` adds explicit proof that every
+  interactive control (skip link, county selector, retry button, evidence
+  disclosure, "Return to the start" link) is a real native, focusable element
+  in a sensible document order. No dependency was added: keyboard tests use
+  the existing Vitest/Testing Library setup, and responsive/contrast
+  validation is manual and documented (jsdom has no real layout or paint
+  pipeline, so it cannot prove visual reflow or rendered contrast).
 
 No client-side analytical calculation: scores, normalization, and the composite
 are rendered exactly as returned by the API.
@@ -103,7 +122,8 @@ frontend/
     pages/
       HomePage.tsx
       CountyPage.tsx     # FIPS validation + profile + dimensions + interpretation + evidence/composite/methodology/provenance
-    styles/base.css      # reset + neutral tokens + focus + responsive container
+    styles/base.css      # reset + neutral tokens + focus + responsive container (CE-C06 focus/contrast fixes)
+    accessibility.test.tsx # CE-C06 keyboard-interaction tests
     test/
       setup.ts
       harness.tsx        # renderApp(), fetch stubs, payload builders
