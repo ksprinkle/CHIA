@@ -286,6 +286,115 @@ code {
   font-style: italic;
 }
 
+/* CE-C04 supporting evidence (subordinate to the primary measure) */
+.evidence {
+  margin-top: var(--space-3);
+  font-size: 0.9375rem;
+  color: var(--color-muted);
+}
+
+.evidence__summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.evidence__method {
+  margin: var(--space-2) 0;
+}
+
+.evidence__list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.evidence__item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+}
+
+.evidence__name {
+  font-weight: 600;
+}
+
+/* CE-C04 experimental composite (secondary to the four dimensions) */
+.composite,
+.methodology,
+.provenance {
+  margin-top: var(--space-5);
+}
+
+.composite__label {
+  margin: 0 0 var(--space-1);
+  font-weight: 600;
+}
+
+.composite__value {
+  margin: 0 0 var(--space-2);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.composite__unavailable {
+  margin: 0 0 var(--space-2);
+  font-style: italic;
+  color: var(--color-muted);
+}
+
+.composite__status,
+.composite__disclosure {
+  margin: var(--space-1) 0 0;
+  color: var(--color-muted);
+}
+
+/* CE-C04 methodology + provenance */
+.methodology__meta,
+.provenance__meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-1) var(--space-4);
+  margin: 0 0 var(--space-3);
+}
+
+.methodology__meta dt,
+.methodology__calc dt,
+.provenance__meta dt {
+  font-weight: 600;
+}
+
+.methodology__meta dd,
+.methodology__calc dd,
+.provenance__meta dd {
+  margin: 0;
+}
+
+.methodology__calc-label {
+  font-weight: 600;
+  margin: var(--space-3) 0 var(--space-1);
+}
+
+.methodology__calc {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.provenance__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.provenance__name {
+  margin: 0 0 var(--space-1);
+  font-weight: 600;
+}
+
 @media (max-width: 600px) {
   .app-main {
     padding: var(--space-4) var(--space-2);

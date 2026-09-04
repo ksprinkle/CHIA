@@ -1,25 +1,18 @@
 import { Link, useParams } from 'react-router-dom'
 
 import { ErrorState } from '../components/ErrorState'
+import { ExperimentalComposite } from '../components/ExperimentalComposite'
 import { Loading } from '../components/Loading'
+import { MethodologyPanel } from '../components/MethodologyPanel'
 import { NotFound } from '../components/NotFound'
+import { ProvenancePanel } from '../components/ProvenancePanel'
+import { SupportingEvidence } from '../components/SupportingEvidence'
 import { useCountyDirectory } from '../lib/countyDirectory'
+import { DIMENSION_ORDER } from '../lib/dimensions'
 import { CountyExplorerProvider, useCountyExplorer } from '../lib/countyExplorer'
 import type { DimensionProfile } from '../lib/types'
 
 const FIVE_DIGIT_FIPS = /^\d{5}$/
-
-/**
- * Canonical dimension order -- the `access_profile` response key order, which
- * matches the governing specification section 8 table. Not an analytical
- * constant: no thresholds, weights, or scores are defined here.
- */
-const DIMENSION_ORDER = [
-  'primary_care',
-  'dental',
-  'mental_health',
-  'mua_p',
-] as const
 
 /** Fixed score explanation (governing specification section 12.2). */
 const SCORE_EXPLANATION =
@@ -67,6 +60,8 @@ function DimensionCard({ dimension }: { dimension: DimensionProfile }) {
     score,
     normalized,
     primary_measure: primaryMeasure,
+    supporting_evidence: supportingEvidence,
+    calculation_method: calculationMethod,
   } = dimension
   const hasScore = available && score !== null
 
@@ -120,6 +115,11 @@ function DimensionCard({ dimension }: { dimension: DimensionProfile }) {
           </div>
         ) : null}
       </dl>
+
+      <SupportingEvidence
+        items={supportingEvidence}
+        calculationMethod={calculationMethod}
+      />
     </li>
   )
 }
@@ -155,7 +155,14 @@ function CountyProfile() {
     )
   }
 
-  const { county, period, access_profile: accessProfile } = explorer.data
+  const {
+    county,
+    period,
+    access_profile: accessProfile,
+    experimental_composite: experimentalComposite,
+    methodology,
+    provenance,
+  } = explorer.data
 
   return (
     <section className="county-profile" aria-labelledby="county-profile-heading">
@@ -190,18 +197,26 @@ function CountyProfile() {
           ))}
         </ol>
       </section>
+
+      <ExperimentalComposite composite={experimentalComposite} />
+      <MethodologyPanel methodology={methodology} accessProfile={accessProfile} />
+      <ProvenancePanel
+        sources={provenance.sources}
+        accessProfile={accessProfile}
+      />
     </section>
   )
 }
 
 /**
- * CE-C03 county route.
+ * County route.
  *
  * Validates the `:countyFips` URL parameter (CE-C02 rules), then renders the
- * assembled Explorer read model for a valid known county: the county profile
- * header and the four access dimensions. Supporting evidence, methodology,
- * provenance, the experimental composite, and per-county interpretation are
- * later slices (CE-C04 / CE-C05) and are not rendered here.
+ * assembled Explorer read model for a valid known county from the single
+ * shared `useCountyExplorer` payload: the county profile header and the four
+ * access dimensions (CE-C03), plus per-dimension supporting evidence, the
+ * experimental composite, methodology, and provenance (CE-C04). Per-county
+ * interpretation and the standardized UI-state model are CE-C05.
  */
 export function CountyPage() {
   const { countyFips = '' } = useParams<{ countyFips: string }>()

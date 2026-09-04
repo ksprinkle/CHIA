@@ -1,0 +1,70 @@
+import { DIMENSION_ORDER } from '../lib/dimensions'
+import type { AccessProfile, SourceRef } from '../lib/types'
+
+/**
+ * CE-C04 provenance / sources (governing specification section 15).
+ *
+ * Renders the API-provided sources verbatim: `source_name`, `publisher`,
+ * `dataset_name`, `reference_period`. All v0.1 `url` / `accessed_at` values are
+ * null, so no external links and no accessed dates are rendered. The
+ * dimension-to-source association comes from `dimension.source_id`.
+ */
+export function ProvenancePanel({
+  sources,
+  accessProfile,
+}: {
+  sources: SourceRef[]
+  accessProfile: AccessProfile
+}) {
+  const dimensionNamesForSource = (sourceId: number): string[] =>
+    DIMENSION_ORDER.filter(
+      (key) => accessProfile[key].source_id === sourceId,
+    ).map((key) => accessProfile[key].dimension_name)
+
+  return (
+    <section className="provenance" aria-labelledby="provenance-heading">
+      <h2 id="provenance-heading">Sources</h2>
+
+      {sources.length === 0 ? (
+        <p className="provenance__empty">No sources recorded.</p>
+      ) : (
+        <ul className="provenance__list">
+          {sources.map((source) => {
+            const usedBy = dimensionNamesForSource(source.source_id)
+            return (
+              <li key={source.source_id} className="provenance__item">
+                <p className="provenance__name">{source.source_name}</p>
+                <dl className="provenance__meta">
+                  {source.publisher ? (
+                    <div>
+                      <dt>Publisher</dt>
+                      <dd>{source.publisher}</dd>
+                    </div>
+                  ) : null}
+                  {source.dataset_name ? (
+                    <div>
+                      <dt>Dataset</dt>
+                      <dd>{source.dataset_name}</dd>
+                    </div>
+                  ) : null}
+                  {source.reference_period ? (
+                    <div>
+                      <dt>Reference period</dt>
+                      <dd>{source.reference_period}</dd>
+                    </div>
+                  ) : null}
+                  {usedBy.length > 0 ? (
+                    <div>
+                      <dt>Used by</dt>
+                      <dd>{usedBy.join(', ')}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </section>
+  )
+}

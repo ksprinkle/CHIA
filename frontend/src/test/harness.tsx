@@ -109,6 +109,8 @@ function makeDimension(
   variableId: string,
   normalized: boolean,
   score: number | null,
+  sourceId: number,
+  evidenceNames: string[],
 ): DimensionProfile {
   return {
     dimension_id: id,
@@ -121,7 +123,7 @@ function makeDimension(
     available: score !== null,
     score,
     score_status: score !== null ? 'calculated' : null,
-    source_id: null,
+    source_id: sourceId,
     primary_measure: {
       variable_id: variableId,
       display_name: `${name} primary measure`,
@@ -131,16 +133,14 @@ function makeDimension(
       normalization_method: normalized ? 'county_percentile_rank_average' : null,
       quality_flag: 'source_validated',
     },
-    supporting_evidence: [
-      {
-        variable_id: `${variableId}_SUPPORT`,
-        display_name: `${name} supporting evidence detail`,
-        unit: 'score',
-        direction: 'higher_burden',
-        raw_value: 7.77,
-        quality_flag: 'source_validated',
-      },
-    ],
+    supporting_evidence: evidenceNames.map((evidenceName, index) => ({
+      variable_id: `${variableId}_SUP_${index + 1}`,
+      display_name: evidenceName,
+      unit: index === evidenceNames.length - 1 ? 'count' : 'score',
+      direction: 'higher_burden',
+      raw_value: 2.5 + index,
+      quality_flag: 'source_validated',
+    })),
   }
 }
 
@@ -160,6 +160,12 @@ export function makeExplorer(
       'PC_HPSA_GEOGRAPHIC_COVERAGE',
       true,
       88,
+      1,
+      [
+        'Primary Care HPSA Area-Weighted Score',
+        'Primary Care HPSA Maximum Score',
+        'Primary Care HPSA Designation Count',
+      ],
     ),
     dental: makeDimension(
       'DENTAL',
@@ -167,6 +173,12 @@ export function makeExplorer(
       'DENTAL_HPSA_GEOGRAPHIC_COVERAGE',
       true,
       29,
+      2,
+      [
+        'Dental HPSA Area-Weighted Score',
+        'Dental HPSA Maximum Score',
+        'Dental HPSA Designation Count',
+      ],
     ),
     mental_health: makeDimension(
       'MENTAL_HEALTH',
@@ -174,6 +186,12 @@ export function makeExplorer(
       'MH_HPSA_GEOGRAPHIC_COVERAGE',
       true,
       23,
+      3,
+      [
+        'Mental Health HPSA Area-Weighted Score',
+        'Mental Health HPSA Maximum Score',
+        'Mental Health HPSA Designation Count',
+      ],
     ),
     mua_p: makeDimension(
       'MUA_P',
@@ -181,6 +199,15 @@ export function makeExplorer(
       'MUAP_GEOGRAPHIC_COVERAGE',
       false,
       99,
+      4,
+      [
+        'MUA/P Mean Score',
+        'MUA/P Maximum Score',
+        'MUA/P Feature Count',
+        'MUA Feature Count',
+        'MUP Feature Count',
+        'MUA/P Unique Source Count',
+      ],
     ),
   }
 
@@ -221,9 +248,36 @@ export function makeExplorer(
       sources: [
         {
           source_id: 1,
-          source_name: 'HRSA HPSA provenance source',
+          source_name: 'Primary Care HPSA',
           publisher: 'HRSA',
-          dataset_name: 'HPSA Spatial Coverage',
+          dataset_name: 'Primary Care HPSA Spatial Coverage',
+          reference_period: 'v0.1 source period',
+          url: null,
+          accessed_at: null,
+        },
+        {
+          source_id: 2,
+          source_name: 'Dental HPSA',
+          publisher: 'HRSA',
+          dataset_name: 'Dental HPSA Spatial Coverage',
+          reference_period: 'v0.1 source period',
+          url: null,
+          accessed_at: null,
+        },
+        {
+          source_id: 3,
+          source_name: 'Mental Health HPSA',
+          publisher: 'HRSA',
+          dataset_name: 'Mental Health HPSA Spatial Coverage',
+          reference_period: 'v0.1 source period',
+          url: null,
+          accessed_at: null,
+        },
+        {
+          source_id: 4,
+          source_name: 'MUA/P',
+          publisher: 'HRSA',
+          dataset_name: 'MUA/P Spatial Coverage',
           reference_period: 'v0.1 source period',
           url: null,
           accessed_at: null,
@@ -232,10 +286,11 @@ export function makeExplorer(
     },
     methodology: {
       methodology_version: 'v0.1',
-      name: 'CHIA Access Profile v0.1 methodology',
-      description: 'Methodology description block.',
+      name: 'CHIA Access Profile v0.1',
+      description:
+        'Four-domain county-level healthcare access profile using validated geographic coverage measures, county percentile-rank normalization, and an experimental equal-weight composite burden measure.',
       status: 'prototype',
-      created_at: null,
+      created_at: '2026-09-02 00:09:27',
       normalization_method: 'county_percentile_rank_average',
     },
   }

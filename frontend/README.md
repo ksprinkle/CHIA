@@ -1,4 +1,4 @@
-# CHIA County Explorer — Frontend (CE-C03)
+# CHIA County Explorer — Frontend (CE-C04)
 
 React + Vite + TypeScript UI for the CHIA County Explorer, built in vertical
 slices:
@@ -15,9 +15,17 @@ slices:
   `:countyFips`), and the county header (name, state, FIPS, period, completeness)
   plus the four access dimensions are rendered from the API payload. Scores are
   shown as API-provided percentile values (rounded for display only) with the
-  fixed score explanation and the geographic-coverage caveat. Supporting
-  evidence, methodology, provenance, the experimental composite, and per-county
-  interpretation are later slices (CE-C04 / CE-C05).
+  fixed score explanation and the geographic-coverage caveat.
+- **CE-C04** — evidence, methodology, and composite, all from the same shared
+  Explorer payload (no second request): per-dimension supporting evidence in a
+  native `<details>` disclosure subordinate to the primary measure; the
+  experimental composite in a page-level section after the four dimensions
+  (persisted value, fixed `Experimental / Provisional` label, fixed disclosure
+  prose — never recomputed, no weights/formula in code); methodology (version,
+  normalization method, name, description, status, per-dimension
+  `calculation_method` verbatim); and provenance (the API sources — name,
+  publisher, dataset, reference period; no links, as all v0.1 URLs are null).
+  Per-county interpretation is CE-C05.
 
 No client-side analytical calculation: scores, normalization, and the composite
 are rendered exactly as returned by the API.
@@ -65,6 +73,7 @@ frontend/
       config.ts         # API_BASE_URL
       types.ts          # mirrors of CE-B01 / CE-B02 response contracts
       apiClient.ts      # listCounties(), getCountyExplorer()
+      dimensions.ts     # canonical dimension order (access_profile key order)
       countyDirectory.tsx  # county-list context (CE-C02)
       countyExplorer.tsx   # Explorer read-model context, keyed to :countyFips (CE-C03)
     components/
@@ -73,9 +82,13 @@ frontend/
       Loading.tsx
       ErrorState.tsx
       NotFound.tsx
+      SupportingEvidence.tsx    # per-dimension evidence disclosure (CE-C04)
+      ExperimentalComposite.tsx # composite section (CE-C04)
+      MethodologyPanel.tsx      # methodology section (CE-C04)
+      ProvenancePanel.tsx       # sources section (CE-C04)
     pages/
       HomePage.tsx
-      CountyPage.tsx     # FIPS validation + county profile + four dimensions
+      CountyPage.tsx     # FIPS validation + profile + dimensions + evidence/composite/methodology/provenance
     styles/base.css      # reset + neutral tokens + focus + responsive container
     test/
       setup.ts

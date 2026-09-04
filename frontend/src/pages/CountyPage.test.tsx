@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 
 import {
   makeCounties,
@@ -8,20 +8,20 @@ import {
   stubCountiesFetch,
 } from '../test/harness'
 
-/** Content that belongs to CE-C04 / CE-C05 / CE-C06, not CE-C03. */
+/**
+ * Content that belongs to CE-C05 (per-county interpretation) or CE-C06
+ * (accessibility/responsive hardening), not to CE-C03/CE-C04.
+ *
+ * CE-C04 legitimately renders supporting evidence, the experimental composite,
+ * methodology, and provenance, so those patterns were removed from this list
+ * when CE-C04 landed (disclosed locked-C03-file test-maintenance).
+ */
 const LATER_SLICE_LEAKAGE = [
-  /supporting evidence/i,
-  /experimental \/ provisional/i,
-  /experimental_provisional/i,
-  /59\.75/, // mocked composite_value
-  /composite/i,
-  /methodology/i,
-  /provenance/i,
-  /CHIA Access Profile v0\.1 methodology/i, // mocked methodology name
-  /HRSA HPSA provenance source/i, // mocked provenance source name
   /interpretation/i,
   /compared (?:to|with)/i,
+  /relative to the other dimensions/i,
   /\b(highest|lowest)\b/i,
+  /this county(?:'s)? (?:burden|score)/i,
 ]
 
 afterEach(() => {
@@ -64,13 +64,18 @@ describe('CountyPage (CE-C03 county profile)', () => {
     })
     renderApp(['/counties/01001'])
 
-    expect(
-      await screen.findByRole('heading', { level: 1, name: /autauga county/i }),
-    ).toBeInTheDocument()
-    expect(screen.getByText('Alabama (AL)')).toBeInTheDocument()
-    expect(screen.getByText('01001')).toBeInTheDocument()
-    expect(screen.getByText('v0.1')).toBeInTheDocument()
-    expect(screen.getByText('Complete')).toBeInTheDocument()
+    const heading = await screen.findByRole('heading', {
+      level: 1,
+      name: /autauga county/i,
+    })
+    // Scope to the profile <header>: CE-C04's methodology panel legitimately
+    // also renders "v0.1" (methodology version), so the period assertion is
+    // pinned to the header where it belongs.
+    const header = heading.closest('header') as HTMLElement
+    expect(within(header).getByText('Alabama (AL)')).toBeInTheDocument()
+    expect(within(header).getByText('01001')).toBeInTheDocument()
+    expect(within(header).getByText('v0.1')).toBeInTheDocument()
+    expect(within(header).getByText('Complete')).toBeInTheDocument()
   })
 
   it('renders the four dimensions in canonical order with descriptions', async () => {
@@ -275,7 +280,7 @@ describe('CountyPage (CE-C03 county profile)', () => {
     )
   })
 
-  it('does not render CE-C04 / CE-C05 / CE-C06 content', async () => {
+  it('does not render CE-C05 interpretation or CE-C06 dialog content', async () => {
     stubValidCounty()
     renderApp(['/counties/01001'])
     await screen.findByRole('heading', { level: 1 })
@@ -283,6 +288,8 @@ describe('CountyPage (CE-C03 county profile)', () => {
     for (const pattern of LATER_SLICE_LEAKAGE) {
       expect(screen.queryByText(pattern)).toBeNull()
     }
+    // CE-C04 disclosures are native <details>, never a modal/dialog widget.
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('does not display stale prior-county data after the county changes', async () => {
@@ -315,5 +322,280 @@ describe('CountyPage (CE-C03 county profile)', () => {
     expect(
       screen.getByRole('region', { name: /access dimensions/i }),
     ).toBeInTheDocument()
+  })
+})
+
+describe('CountyPage (CE-C04 evidence / methodology / composite)', () => {
+  it('renders the whole page from a single shared Explorer request', async () => {
+    const fetchMock = stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 2, name: /experimental composite/i })
+
+    const explorerCalls = fetchMock.mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => url.includes('/explorer'))
+    expect(explorerCalls).toEqual(['/api/v1/counties/01001/explorer'])
+  })
+
+  it('renders supporting evidence for every dimension, incl. MUA/P six items', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    // one <summary> disclosure per dimension
+    expect(screen.getAllByText('Supporting evidence')).toHaveLength(4)
+
+    const muaEvidence = [
+      'MUA/P Mean Score',
+      'MUA/P Maximum Score',
+      'MUA/P Feature Count',
+      'MUA Feature Count',
+      'MUP Feature Count',
+      'MUA/P Unique Source Count',
+    ]
+    for (const name of muaEvidence) {
+      expect(screen.getByText(name)).toBeInTheDocument()
+    }
+    expect(screen.getByText('Primary Care HPSA Area-Weighted Score')).toBeInTheDocument()
+  })
+
+  it('renders evidence raw values without rounding', async () => {
+    stubApi({
+      counties: makeCounties(['01001']),
+      explorer: (fips) =>
+        makeExplorer(fips, {
+          dimensions: {
+            primary_care: {
+              supporting_evidence: [
+                {
+                  variable_id: 'PC_SUP_1',
+                  display_name: 'PC Area-Weighted Score',
+                  unit: 'score',
+                  direction: 'higher_burden',
+                  raw_value: 14.99984814229961,
+                  quality_flag: 'source_validated',
+                },
+              ],
+            },
+          },
+        }),
+    })
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    expect(
+      screen.getByText(/14\.99984814229961 score/),
+    ).toBeInTheDocument()
+  })
+
+  it('renders a native <details> disclosure (not a modal) that toggles open', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const summary = screen.getAllByText('Supporting evidence')[0]
+    const details = summary.closest('details') as HTMLDetailsElement
+    expect(details).toBeInTheDocument()
+    expect(details.open).toBe(false)
+    fireEvent.click(summary)
+    expect(details.open).toBe(true)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('renders methodology fields and per-dimension calculation methods', async () => {
+    stubApi({
+      counties: makeCounties(['01001']),
+      explorer: (fips) =>
+        makeExplorer(fips, {
+          dimensions: {
+            primary_care: {
+              calculation_method: 'PC calc: percentile rank of the primary variable.',
+            },
+          },
+        }),
+    })
+    renderApp(['/counties/01001'])
+    const methodology = await screen.findByRole('region', { name: /methodology/i })
+
+    expect(within(methodology).getByText('county_percentile_rank_average')).toBeInTheDocument()
+    expect(within(methodology).getByText('prototype')).toBeInTheDocument()
+    expect(
+      within(methodology).getByText(
+        /Four-domain county-level healthcare access profile/i,
+      ),
+    ).toBeInTheDocument()
+    expect(
+      within(methodology).getByText('PC calc: percentile rank of the primary variable.'),
+    ).toBeInTheDocument()
+    expect(
+      within(methodology).getByText('Mental Health Access calculation method.'),
+    ).toBeInTheDocument()
+  })
+
+  it('renders all four provenance sources with no links and no accessed dates', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    const sources = await screen.findByRole('region', { name: /sources/i })
+
+    for (const name of ['Primary Care HPSA', 'Dental HPSA', 'Mental Health HPSA', 'MUA/P']) {
+      expect(within(sources).getByText(name)).toBeInTheDocument()
+    }
+    expect(within(sources).getAllByText('HRSA')).toHaveLength(4)
+    expect(within(sources).getByText('Dental HPSA Spatial Coverage')).toBeInTheDocument()
+    expect(within(sources).getAllByText('v0.1 source period')).toHaveLength(4)
+    // dimension-to-source association via source_id
+    expect(within(sources).getByText('Primary Care Access')).toBeInTheDocument()
+    // no external links, no accessed dates
+    expect(within(sources).queryByRole('link')).toBeNull()
+    expect(within(sources).queryByText(/accessed/i)).toBeNull()
+  })
+
+  it('renders the experimental composite value, label and status', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    const composite = await screen.findByRole('region', {
+      name: /experimental composite/i,
+    })
+
+    // 59.75 -> 60 (whole-number display rounding, not recalculated)
+    expect(within(composite).getByText('60')).toBeInTheDocument()
+    expect(within(composite).getByText('Experimental / Provisional')).toBeInTheDocument()
+    expect(within(composite).getByText(/experimental_provisional/i)).toBeInTheDocument()
+    expect(
+      within(composite).getByText(
+        /equal-weight combination of the four dimension access scores/i,
+      ),
+    ).toBeInTheDocument()
+    expect(
+      within(composite).getByText(/not a validated measure/i),
+    ).toBeInTheDocument()
+  })
+
+  it('places the composite after the four dimensions', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const dimensions = screen.getByRole('region', { name: /access dimensions/i })
+    const composite = screen.getByRole('region', { name: /experimental composite/i })
+    expect(
+      dimensions.compareDocumentPosition(composite) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    // not a fifth item in the dimensions list
+    expect(within(dimensions).queryByText(/experimental composite/i)).toBeNull()
+  })
+
+  it('does not recalculate the composite (renders the persisted value)', async () => {
+    stubApi({
+      counties: makeCounties(['01001']),
+      explorer: (fips) => {
+        // Dimension scores that would average to 50; persisted composite is 12.3.
+        const payload = makeExplorer(fips, {
+          dimensions: {
+            primary_care: { score: 40, primary_measure: { normalized_value: 40 } },
+            dental: { score: 60, primary_measure: { normalized_value: 60 } },
+            mental_health: { score: 40, primary_measure: { normalized_value: 40 } },
+            mua_p: { score: 60 },
+          },
+        })
+        return {
+          ...payload,
+          experimental_composite: {
+            ...payload.experimental_composite,
+            composite_value: 12.3,
+          },
+        }
+      },
+    })
+    renderApp(['/counties/01001'])
+    const composite = await screen.findByRole('region', {
+      name: /experimental composite/i,
+    })
+
+    expect(within(composite).getByText('12')).toBeInTheDocument()
+    expect(within(composite).queryByText('50')).toBeNull()
+  })
+
+  it('shows an unavailable composite with named missing dimensions and no number', async () => {
+    stubApi({
+      counties: makeCounties(['01001']),
+      explorer: (fips) => {
+        const payload = makeExplorer(fips)
+        return {
+          ...payload,
+          experimental_composite: {
+            label: 'Experimental / Provisional',
+            composite_value: null,
+            status: 'experimental_provisional',
+            missing_dimensions: ['DENTAL'],
+          },
+        }
+      },
+    })
+    renderApp(['/counties/01001'])
+    const composite = await screen.findByRole('region', {
+      name: /experimental composite/i,
+    })
+
+    expect(within(composite).getByText(/not available/i)).toBeInTheDocument()
+    expect(within(composite).getByText(/DENTAL/)).toBeInTheDocument()
+    expect(within(composite).getByText('Experimental / Provisional')).toBeInTheDocument()
+    expect(within(composite).queryByText(/^\d+$/)).toBeNull()
+  })
+
+  it('omits a dimension evidence block when the evidence list is empty', async () => {
+    stubApi({
+      counties: makeCounties(['01001']),
+      explorer: (fips) =>
+        makeExplorer(fips, {
+          dimensions: {
+            dental: { supporting_evidence: [], calculation_method: null },
+          },
+        }),
+    })
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    // 3 disclosures instead of 4 (dental has neither evidence nor a method)
+    expect(screen.getAllByText('Supporting evidence')).toHaveLength(3)
+    // dental itself still renders
+    expect(
+      screen.getByRole('heading', { level: 3, name: /dental access/i }),
+    ).toBeInTheDocument()
+  })
+
+  it('keeps all CE-C03 content intact alongside the CE-C04 additions', async () => {
+    stubApi({
+      counties: makeCounties(['01001']),
+      explorer: (fips) =>
+        makeExplorer(fips, {
+          county: { county_name: 'Autauga County', state_name: 'Alabama', state_abbr: 'AL' },
+        }),
+    })
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1, name: /autauga county/i })
+
+    expect(screen.getByText('Alabama (AL)')).toBeInTheDocument()
+    expect(screen.getByText('01001')).toBeInTheDocument()
+    expect(screen.getByText('Complete')).toBeInTheDocument()
+    expect(
+      screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent),
+    ).toEqual([
+      'Primary Care Access',
+      'Dental Access',
+      'Mental Health Access',
+      'MUA/P Access',
+    ])
+    expect(
+      screen.getByText(/percentile values relative to the CHIA county universe/i),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/not the percentage of residents who lack access to care/i),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/not percentile-normalized in v0\.1/i),
+    ).toBeInTheDocument()
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
   })
 })
