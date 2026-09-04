@@ -1,17 +1,26 @@
-# CHIA County Explorer — Frontend (CE-C01 foundation)
+# CHIA County Explorer — Frontend (CE-C03)
 
-React + Vite + TypeScript foundation for the CHIA County Explorer UI. This slice
-(CE-C01) establishes only the application skeleton:
+React + Vite + TypeScript UI for the CHIA County Explorer, built in vertical
+slices:
 
-- application shell / layout with an empty header slot (populated in CE-C03)
-- base route table (`/`, `/counties/:countyFips`, catch-all)
-- a read-only, typed API client for the CHIA County API
-- shared, accessible UI state primitives (loading / error / not-found)
-- a minimal, neutral, accessible visual foundation (no design system)
+- **CE-C01** — application shell / layout, base route table (`/`,
+  `/counties/:countyFips`, catch-all), a read-only typed API client, shared
+  accessible state primitives (loading / error / not-found), and a minimal,
+  neutral, accessible visual foundation (no design system).
+- **CE-C02** — county selection (native `<select>` + label) with the URL as the
+  authoritative selected-county state; malformed vs. unknown FIPS distinguished
+  in place.
+- **CE-C03** — the county profile: the Explorer read model is fetched for the
+  URL-selected county (`CountyExplorerProvider` / `useCountyExplorer`, keyed to
+  `:countyFips`), and the county header (name, state, FIPS, period, completeness)
+  plus the four access dimensions are rendered from the API payload. Scores are
+  shown as API-provided percentile values (rounded for display only) with the
+  fixed score explanation and the geographic-coverage caveat. Supporting
+  evidence, methodology, provenance, the experimental composite, and per-county
+  interpretation are later slices (CE-C04 / CE-C05).
 
-It renders an initial state with **no county assumed or selected**. County
-selection and URL state are CE-C02; the county profile and the four dimensions
-are CE-C03.
+No client-side analytical calculation: scores, normalization, and the composite
+are rendered exactly as returned by the API.
 
 ## Requirements
 
@@ -50,20 +59,25 @@ frontend/
   .eslintrc.cjs
   src/
     main.tsx            # React root
-    App.tsx             # RouterProvider
-    router.tsx          # base route table
+    App.tsx             # CountyDirectoryProvider + RouterProvider
+    router.tsx          # route table (exported `routes` for tests)
     lib/
       config.ts         # API_BASE_URL
       types.ts          # mirrors of CE-B01 / CE-B02 response contracts
       apiClient.ts      # listCounties(), getCountyExplorer()
+      countyDirectory.tsx  # county-list context (CE-C02)
+      countyExplorer.tsx   # Explorer read-model context, keyed to :countyFips (CE-C03)
     components/
       Layout.tsx
+      CountySelector.tsx
       Loading.tsx
       ErrorState.tsx
       NotFound.tsx
     pages/
       HomePage.tsx
-      CountyRoutePlaceholder.tsx
+      CountyPage.tsx     # FIPS validation + county profile + four dimensions
     styles/base.css      # reset + neutral tokens + focus + responsive container
-    test/setup.ts
+    test/
+      setup.ts
+      harness.tsx        # renderApp(), fetch stubs, payload builders
 ```

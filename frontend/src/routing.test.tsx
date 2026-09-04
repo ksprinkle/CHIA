@@ -1,6 +1,12 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 
-import { makeCounties, renderApp, stubCountiesFetch } from './test/harness'
+import {
+  makeCounties,
+  makeExplorer,
+  renderApp,
+  stubApi,
+  stubCountiesFetch,
+} from './test/harness'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -24,8 +30,12 @@ describe('CE-C02 county selection & URL state', () => {
     expect(screen.getByText(/no county is currently selected/i)).toBeInTheDocument()
   })
 
-  it('selecting a county updates the URL and the county route', async () => {
-    stubCountiesFetch(makeCounties(['01001', '01003']))
+  it('selecting a county updates the URL and renders that county profile', async () => {
+    stubApi({
+      counties: makeCounties(['01001', '01003']),
+      explorer: (fips) =>
+        makeExplorer(fips, { county: { county_name: `County ${fips}` } }),
+    })
     const { router } = renderApp(['/'])
 
     fireEvent.change(await findSelect(), { target: { value: '01001' } })
@@ -33,17 +43,23 @@ describe('CE-C02 county selection & URL state', () => {
     await waitFor(() =>
       expect(router.state.location.pathname).toBe('/counties/01001'),
     )
-    const heading = await screen.findByRole('heading', { level: 1 })
-    expect(heading).toHaveTextContent('(01001)')
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /county 01001/i }),
+    ).toBeInTheDocument()
     expect((await findSelect()).value).toBe('01001')
   })
 
   it('supports direct navigation to a county URL', async () => {
-    stubCountiesFetch(makeCounties(['01001', '01003']))
+    stubApi({
+      counties: makeCounties(['01001', '01003']),
+      explorer: (fips) =>
+        makeExplorer(fips, { county: { county_name: `County ${fips}` } }),
+    })
     renderApp(['/counties/01003'])
 
-    const heading = await screen.findByRole('heading', { level: 1 })
-    expect(heading).toHaveTextContent('(01003)')
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /county 01003/i }),
+    ).toBeInTheDocument()
     expect((await findSelect()).value).toBe('01003')
   })
 
@@ -87,9 +103,19 @@ describe('CE-C02 county selection & URL state', () => {
     expect(router.state.location.pathname).toBe('/counties/55555')
   })
 
-  it('never requests the Explorer endpoint during CE-C02 flows', async () => {
-    const fetchMock = stubCountiesFetch(makeCounties(['01001', '01003']))
+  it('requests the Explorer endpoint only once a county is selected', async () => {
+    const fetchMock = stubApi({
+      counties: makeCounties(['01001', '01003']),
+      explorer: (fips) => makeExplorer(fips),
+    })
     const { router } = renderApp(['/'])
+    await findSelect()
+
+    expect(
+      fetchMock.mock.calls
+        .map((call) => String(call[0]))
+        .some((url) => url.includes('/explorer')),
+    ).toBe(false)
 
     fireEvent.change(await findSelect(), { target: { value: '01001' } })
     await waitFor(() =>
@@ -97,11 +123,9 @@ describe('CE-C02 county selection & URL state', () => {
     )
     await screen.findByRole('heading', { level: 1 })
 
-    const requested = fetchMock.mock.calls.map((call) => String(call[0]))
-    expect(requested.length).toBeGreaterThan(0)
-    for (const url of requested) {
-      expect(url).toContain('/api/v1/counties')
-      expect(url).not.toContain('/explorer')
-    }
+    const explorerCalls = fetchMock.mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => url.includes('/explorer'))
+    expect(explorerCalls).toEqual(['/api/v1/counties/01001/explorer'])
   })
 })
