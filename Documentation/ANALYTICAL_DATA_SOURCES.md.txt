@@ -1,0 +1,317 @@
+# Community Health Intelligence Atlas (CHIA)
+
+# Analytical Data Sources
+
+## Purpose
+
+This document records the provenance of the authoritative **analytical** source
+artifacts that feed the CHIA v0.1 processing pipeline (CE-A00..CE-A06), so that
+every value persisted in `Data/Model/chia_v01.sqlite` can be traced back to an
+exact, hash-identified source vintage together with the methodology version that
+transformed it.
+
+It is the analytical-layer counterpart to
+`Documentation/GEOGRAPHIC_DATA_SOURCES.md.txt`, which covers the separate
+presentation/navigation geographic boundary layer (CE-E01). The two layers do
+not share data and are versioned independently.
+
+This document is produced by **CE-E12A** (data-vintage design; documentation
+only). CE-E12A records these facts; it does **not** modify the database, the
+build scripts, the seed SQL, or any application code. Populating the persisted
+`source` table with the values below is the separately authorized follow-on
+slice **CE-E12B**.
+
+---
+
+# Governing Principle
+
+> A CHIA profile must always be reproducible from a known set of source-data
+> vintages and a known methodology version.
+
+Two identifiers, kept deliberately separate, are together sufficient to
+reproduce any persisted profile value:
+
+| Identifier | Where it lives | v0.1 value |
+| --- | --- | --- |
+| **Methodology version** | `methodology.methodology_version`, `normalized_measure.methodology_version`, `dimension_score.methodology_version`, `composite_score.methodology_version`, `dimension_definition.methodology_version` | `v0.1` |
+| **Source-data vintage** | `source.reference_period` (+ `source.url`, `source.accessed_at`, and — proposed for CE-E12B — a content hash) | *placeholder today; target values below* |
+
+`county_period.period` is the analytical-run partition key. In v0.1 it is
+coupled 1:1 to the methodology version (value `v0.1`) and is asserted `== 'v0.1'`
+by `Data/Model/validate_v01_county_explorer.py` and the backend suite. It is
+**not** a data-vintage field and CE-E12A/CE-E12B do not change its value.
+
+---
+
+# Pipeline Position
+
+```
+HRSA Data Warehouse full-detail exports         (Data/Raw/, gitignored)
+  BCD_HPSA_FCT_DET_PC.csv / _DH.csv / _MH.csv
+  MUA_DET.csv
+        |
+        v   validated spatial-coverage work (pre-CE-A00; area-intersection
+        |   against the 2020 county universe, severity/designation rollups)
+        v
+Validated spatial-coverage workbooks            (Data/Processed/, gitignored)
+  CHIA_Primary_Care_HPSA_Spatial_Coverage_Validated_FINAL.xlsx
+  CHIA_Dental_HPSA_Spatial_Coverage_Validated_FINAL.xlsx
+  CHIA_Mental_Health_HPSA_Spatial_Coverage_Validated_FINAL.xlsx
+  CHIA_MUA_P_Spatial_Coverage_Validated.xlsx
+        |
+        v   Data/Model/build_v01_database.py   (sheet "County Coverage")
+        v
+observation
+        |
+        v   Data/Model/normalize_v01_database.py      -> normalized_measure
+        v   Data/Model/build_v01_dimension_scores.py  -> dimension_score
+        v   Data/Model/build_v01_composite_scores.py  -> composite_score
+        v
+Data/Model/chia_v01.sqlite  ->  read-only FastAPI  ->  County Explorer UI
+```
+
+The four `Data/Processed/*.xlsx` workbooks are the **direct** build inputs
+(`build_v01_database.py :: SOURCE_FILES`). The four `Data/Raw/*.csv` files are
+their documented upstream (the HRSA exports the spatial-coverage work consumed);
+they are recorded here for traceability but are not read by any script in this
+repository's `Data/Model/` pipeline.
+
+No script in the analytical pipeline (`normalize_v01_database.py`,
+`build_v01_dimension_scores.py`, `build_v01_composite_scores.py`, or any
+`validate_v01_*`) reads the `source` table. `source` participates only in the
+presentation-layer provenance join
+(`app/services/county_explorer.py :: _load_provenance`) and the CE-E11 per-county
+CSV export. Populating source-vintage metadata therefore cannot change any
+analytical value.
+
+---
+
+# Source Vintage
+
+All four v0.1 analytical sources are extracts of the **HRSA Data Warehouse**,
+taken as a single snapshot. Every record in each raw export carries a uniform
+`Data Warehouse Record Create Date` of **2026-08-29** (verified across all rows:
+PC 79,358 / DH 46,316 / MH 40,736 / MUA-P 19,778). The local retrieval date
+matches the create date.
+
+| Field | Value |
+| --- | --- |
+| Publisher | U.S. Health Resources & Services Administration (HRSA) |
+| Data store | HRSA Data Warehouse |
+| Snapshot date | 2026-08-29 (`Data Warehouse Record Create Date`, uniform across all records) |
+| Retrieved (`accessed_at`) | 2026-08-29 |
+| Canonical download location | `https://data.hrsa.gov/data/download` (HPSA and MUA/P "full detail" CSV exports) |
+| License / terms | Public domain (U.S. federal government work) |
+
+## `reference_period` string convention
+
+A single human-readable, sortable string per `source` row, of the form:
+
+```
+<data store> snapshot <ISO-8601 date>
+```
+
+For every v0.1 `source` row the target value is:
+
+```
+HRSA Data Warehouse snapshot 2026-08-29
+```
+
+This replaces the current placeholder `v0.1 source period`. `source.url` and
+`source.accessed_at` are populated alongside it (both currently `NULL`).
+
+> Open item carried to CE-E12B (Q-D5): the exact deep-link download URL for each
+> HRSA full-detail export should be confirmed against the HRSA download portal at
+> population time. `https://data.hrsa.gov/data/download` is the verified
+> canonical landing location; a more specific per-export URL is not recorded
+> in-repo today.
+
+---
+
+# Source Artifacts and Content Hashes
+
+Hashes below were computed by CE-E12A directly from the existing on-disk files
+(read-only). They are reproducible with the snippet in the next section.
+
+`Data/Raw/` and `Data/Processed/` are **gitignored** (see `.gitignore` lines
+"Raw source data" and "Generated/processed analytical artifacts"), exactly as
+`Data/Raw/GIS/...` is for the geographic layer. These artifacts are therefore
+**not committed**; this document's recorded hashes are the in-repo identity of
+record for them.
+
+## 1. Primary Care HPSA — `source_id` 1
+
+| Field | Value |
+| --- | --- |
+| `source_name` | `Primary Care HPSA` |
+| `publisher` | `HRSA` |
+| `dataset_name` | `Primary Care HPSA Spatial Coverage` |
+| Target `reference_period` | `HRSA Data Warehouse snapshot 2026-08-29` |
+| Build input (Data/Processed) | `CHIA_Primary_Care_HPSA_Spatial_Coverage_Validated_FINAL.xlsx` |
+| &nbsp;&nbsp;size / sha-256 | 296,183 bytes / `709e9ed6070f71e466b65b0928d1dbe23d3dd685ecfb81d4cb1cc0ee637c2d93` |
+| &nbsp;&nbsp;md5 | `8589113d74d017f918cf399aa4474301` |
+| &nbsp;&nbsp;sheet consumed | `County Coverage` |
+| Upstream raw (Data/Raw) | `BCD_HPSA_FCT_DET_PC.csv` — 79,358 rows |
+| &nbsp;&nbsp;size / sha-256 | 48,280,174 bytes / `4552ebf09bc5a40d79d71df8ea84aea165de2205953615e03571ad84f1d6b132` |
+| &nbsp;&nbsp;md5 | `d54b49cf78367dd520d6415396ab32a0` |
+| Primary variable | `PC_HPSA_GEOGRAPHIC_COVERAGE` (percentile-normalized) |
+| Supporting variables | `PC_HPSA_AREA_WEIGHTED_SCORE`, `PC_HPSA_MAX_SCORE`, `PC_HPSA_DESIGNATION_COUNT` |
+
+## 2. Dental HPSA — `source_id` 2
+
+| Field | Value |
+| --- | --- |
+| `source_name` | `Dental HPSA` |
+| `publisher` | `HRSA` |
+| `dataset_name` | `Dental HPSA Spatial Coverage` |
+| Target `reference_period` | `HRSA Data Warehouse snapshot 2026-08-29` |
+| Build input (Data/Processed) | `CHIA_Dental_HPSA_Spatial_Coverage_Validated_FINAL.xlsx` |
+| &nbsp;&nbsp;size / sha-256 | 267,261 bytes / `3334807f5cd7ecbd2002e2a672705dfd1a7f2a36df43d313db0b234332c61065` |
+| &nbsp;&nbsp;md5 | `606a43984e7910b450ad9523d7caa05f` |
+| &nbsp;&nbsp;sheet consumed | `County Coverage` |
+| Upstream raw (Data/Raw) | `BCD_HPSA_FCT_DET_DH.csv` — 46,316 rows |
+| &nbsp;&nbsp;size / sha-256 | 28,185,606 bytes / `8c270fd7d8b48d5ff521e4fbb3d3acc8b856c4945decb5b2e095a25c9cf54e57` |
+| &nbsp;&nbsp;md5 | `d6251eef37c090cad82375fe8140eef0` |
+| Primary variable | `DENTAL_HPSA_GEOGRAPHIC_COVERAGE` (percentile-normalized) |
+| Supporting variables | `DENTAL_HPSA_AREA_WEIGHTED_SCORE`, `DENTAL_HPSA_MAX_SCORE`, `DENTAL_HPSA_DESIGNATION_COUNT` |
+
+## 3. Mental Health HPSA — `source_id` 3
+
+| Field | Value |
+| --- | --- |
+| `source_name` | `Mental Health HPSA` |
+| `publisher` | `HRSA` |
+| `dataset_name` | `Mental Health HPSA Spatial Coverage` |
+| Target `reference_period` | `HRSA Data Warehouse snapshot 2026-08-29` |
+| Build input (Data/Processed) | `CHIA_Mental_Health_HPSA_Spatial_Coverage_Validated_FINAL.xlsx` |
+| &nbsp;&nbsp;size / sha-256 | 294,462 bytes / `72e6b52fa73247e6975ccb47bd09368bfc1f56f7a7f5ac14f95b8def67bb430b` |
+| &nbsp;&nbsp;md5 | `acf6cd649e9f21ed9c2dbac64f622146` |
+| &nbsp;&nbsp;sheet consumed | `County Coverage` |
+| Upstream raw (Data/Raw) | `BCD_HPSA_FCT_DET_MH.csv` — 40,736 rows |
+| &nbsp;&nbsp;size / sha-256 | 24,723,938 bytes / `a9c9d54714ad85661c1a91de39ca5678de59f01e2640c2d5a6b7543864997bf1` |
+| &nbsp;&nbsp;md5 | `173dada5defb4ca959a90a61e0d7b07c` |
+| Primary variable | `MH_HPSA_GEOGRAPHIC_COVERAGE` (percentile-normalized) |
+| Supporting variables | `MH_HPSA_AREA_WEIGHTED_SCORE`, `MH_HPSA_MAX_SCORE`, `MH_HPSA_DESIGNATION_COUNT` |
+
+## 4. MUA/P — `source_id` 4
+
+| Field | Value |
+| --- | --- |
+| `source_name` | `MUA/P` |
+| `publisher` | `HRSA` |
+| `dataset_name` | `MUA/P Spatial Coverage` |
+| Target `reference_period` | `HRSA Data Warehouse snapshot 2026-08-29` |
+| Build input (Data/Processed) | `CHIA_MUA_P_Spatial_Coverage_Validated.xlsx` *(no `_FINAL` suffix — matches `build_v01_database.py :: SOURCE_FILES`)* |
+| &nbsp;&nbsp;size / sha-256 | 470,272 bytes / `7e8b0fd83bed93f0a8d1f0939b79e7302a96fa218775dd7d7b41597ab922f218` |
+| &nbsp;&nbsp;md5 | `9a04e1254308aea9f3d62f503dba06b4` |
+| &nbsp;&nbsp;sheet consumed | `County Coverage` |
+| Upstream raw (Data/Raw) | `MUA_DET.csv` — 19,778 rows |
+| &nbsp;&nbsp;size / sha-256 | 8,659,019 bytes / `7d9b076bbbc188c81e98dd0cffa0a2b98173d08c6b0e65788c917d808e3da461` |
+| &nbsp;&nbsp;md5 | `94684ec2021d3222ecb4c4051574f2b8` |
+| Primary variable | `MUAP_GEOGRAPHIC_COVERAGE` (**raw**; not percentile-normalized in v0.1) |
+| Supporting variables | `MUAP_MEAN_SCORE`, `MUAP_MAX_SCORE`, `MUAP_FEATURE_COUNT`, `MUA_FEATURE_COUNT`, `MUP_FEATURE_COUNT`, `MUAP_UNIQUE_SOURCE_COUNT` |
+
+---
+
+# Reproducibility Verification
+
+The recorded processed-artifact hashes are reproducible from the existing files
+with no change to any tracked file:
+
+```bash
+python - <<'PY'
+import hashlib
+from pathlib import Path
+
+EXPECTED = {
+    "Data/Processed/CHIA_Primary_Care_HPSA_Spatial_Coverage_Validated_FINAL.xlsx":
+        "709e9ed6070f71e466b65b0928d1dbe23d3dd685ecfb81d4cb1cc0ee637c2d93",
+    "Data/Processed/CHIA_Dental_HPSA_Spatial_Coverage_Validated_FINAL.xlsx":
+        "3334807f5cd7ecbd2002e2a672705dfd1a7f2a36df43d313db0b234332c61065",
+    "Data/Processed/CHIA_Mental_Health_HPSA_Spatial_Coverage_Validated_FINAL.xlsx":
+        "72e6b52fa73247e6975ccb47bd09368bfc1f56f7a7f5ac14f95b8def67bb430b",
+    "Data/Processed/CHIA_MUA_P_Spatial_Coverage_Validated.xlsx":
+        "7e8b0fd83bed93f0a8d1f0939b79e7302a96fa218775dd7d7b41597ab922f218",
+}
+for path, expected in EXPECTED.items():
+    actual = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    print(("OK  " if actual == expected else "FAIL") + "  " + path)
+    if actual != expected:
+        print("       expected " + expected)
+        print("       actual   " + actual)
+PY
+```
+
+The upstream raw-file hashes in the per-source tables above verify the same way
+against `Data/Raw/`.
+
+---
+
+# Current Database Identity
+
+`Data/Model/chia_v01.sqlite` as of CE-E12A (unchanged since `ce-e11` / `691f2b7`):
+
+| Digest | Value |
+| --- | --- |
+| md5 | `f53b3de17b627b3b02796df9de33b5a4` |
+| sha-256 | `0d8bb417ccf72acf0cef7d17bcca15627900d0df419fc259de553a95b9aa2966` |
+
+The sha-256 is pinned as `EXPECTED_PRODUCTION_SHA256` by six backend test files
+(`test_ce_a06`, `test_ce_b01`, `test_ce_b02`, `test_ce_d01_concurrent_connection`,
+`test_ce_d01_county_reference_correction`, `test_ce_e09`); the md5 is the value
+the CE validation gate checks. Any change to the database file — data or schema —
+must update all seven anchors in one coordinated commit. That is the scope of
+CE-E12B, not CE-E12A.
+
+---
+
+# Persisted `source` Table — Today vs. Target
+
+Current rows in `Data/Model/chia_v01.sqlite` (`source` columns:
+`source_id, source_name, publisher, dataset_name, reference_period, url, accessed_at`):
+
+```
+1 | Primary Care HPSA  | HRSA | Primary Care HPSA Spatial Coverage  | v0.1 source period | NULL | NULL
+2 | Dental HPSA        | HRSA | Dental HPSA Spatial Coverage        | v0.1 source period | NULL | NULL
+3 | Mental Health HPSA | HRSA | Mental Health HPSA Spatial Coverage | v0.1 source period | NULL | NULL
+4 | MUA/P              | HRSA | MUA/P Spatial Coverage              | v0.1 source period | NULL | NULL
+```
+
+CE-E12B target (design; not applied here):
+
+```
+reference_period : "HRSA Data Warehouse snapshot 2026-08-29"   (all four rows)
+url              : "https://data.hrsa.gov/data/download"        (pending Q-D5 deep-link confirmation)
+accessed_at      : "2026-08-29"                                 (all four rows)
+content_sha256   : per-source processed-artifact sha-256 above  (new nullable column — schema change)
+artifact_filename: per-source Data/Processed filename above     (new nullable column — optional, Q-D2)
+```
+
+`seed_v01.sql` (INSERT OR IGNORE, `reference_period` `'v0.1 source period'`) and
+`build_v01_database.py` (`source_metadata` loop, `reference_period` = the
+`"v0.1"` period string) currently disagree on the placeholder value; CE-E12B
+aligns both to the target string.
+
+---
+
+# Known Limitations and Notes
+
+* **CE-E12A is documentation only.** No `.py`, `.sql`, `.sqlite`, frontend, or
+  test file is modified. The persisted `source` table still holds the
+  `v0.1 source period` placeholder and `NULL` `url` / `accessed_at` until
+  CE-E12B is authorized and run.
+* **Artifacts are gitignored.** `Data/Raw/` and `Data/Processed/` are not
+  committed. This document's recorded hashes are the in-repo identity of record;
+  they let a future environment confirm it holds the same source vintage before
+  trusting a rebuild.
+* **HRSA deep-link URLs** for the individual full-detail exports are not recorded
+  in-repo. The verified canonical location is `https://data.hrsa.gov/data/download`.
+* **Vintage granularity.** HRSA publishes a continuously updated data warehouse
+  rather than discrete numbered releases; the `Data Warehouse Record Create Date`
+  (2026-08-29, uniform) is the most precise vintage identifier available and is
+  what the `reference_period` convention encodes.
+* A future source refresh (a newer HRSA snapshot) is a methodology-version-neutral
+  change to source vintage; it would require regenerating `chia_v01.sqlite`, a
+  full analytical re-run and re-validation, updating this document, and
+  re-baselining the seven database-hash anchors — a dedicated slice, not covered
+  here.

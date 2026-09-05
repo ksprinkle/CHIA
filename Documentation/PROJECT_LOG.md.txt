@@ -307,4 +307,39 @@ The CE-E07 manual browser / screen-reader / touch-device / reduced-motion checkl
 
 ---
 
+# Version 0.2.0 — County Explorer v0.2 UX: Data Vintage & Source Refresh Foundation (CE-E12A)
+
+**Date:** September 5, 2026
+
+## Scope
+
+Architecture / design only, documentation-only. Establishes authoritative source-vintage metadata for the CHIA v0.1 analytical sources so the governing principle holds explicitly: *a CHIA profile must always be reproducible from a known set of source-data vintages and a known methodology version.* CE-E12A records the design, the exact target values, and the migration plan; it changes no `.py`, `.sql`, `.sqlite`, frontend, or test file. Persisting the metadata into the database is the separately authorized follow-on slice CE-E12B.
+
+## Deliverables
+
+- `Documentation/ANALYTICAL_DATA_SOURCES.md.txt` (new) — the authoritative analytical-source catalogue (counterpart to `GEOGRAPHIC_DATA_SOURCES.md.txt`): per source — publisher, dataset, vintage, canonical URL, retrieved date, raw + processed artifact paths, and reproducible SHA-256 / md5 for every build-input workbook and its upstream HRSA export; the `reference_period` string convention; and the current-vs-target state of the persisted `source` table.
+- `Documentation/CE_E12A_Data_Vintage_Design.md.txt` (new) — the design record: the seven determinations, the reproducibility contract, the CE-E12B migration + seven-anchor hash re-baseline checklist, and six open decisions (Q-D1–Q-D6) with recommended dispositions.
+- This CE-E12A entry.
+
+## Key determinations
+
+- **`county_period.period` is not repurposed.** It is the analytical-run partition key, coupled 1:1 to `methodology_version` (`v0.1`) and asserted `== 'v0.1'` by `validate_v01_county_explorer.py` and the backend suite. “Data vintage” becomes a new derived presentational concept built from per-source `reference_period`.
+- **Source vintage.** All four v0.1 sources are one HRSA Data Warehouse snapshot; every raw record carries a uniform `Data Warehouse Record Create Date` of 2026-08-29 (verified across all rows: PC 79,358 / DH 46,316 / MH 40,736 / MUA-P 19,778). Target `reference_period` for every `source` row: `HRSA Data Warehouse snapshot 2026-08-29`, with `url` and `accessed_at` populated (both `NULL` today; placeholder `v0.1 source period` today).
+- **Reproducibility metadata.** Minimum per-source set adds an artifact **SHA-256** (and optionally the build-input filename). These need one or two additive nullable `TEXT` columns on `source` — the only schema change, and it is deferred to CE-E12B because it necessarily rewrites the byte-pinned database.
+- **No analytical value can change.** No analytical script (`normalize_v01_database.py`, `build_v01_dimension_scores.py`, `build_v01_composite_scores.py`, any `validate_v01_*`) reads the `source` table; it is consumed only by the presentation provenance join and the CE-E11 CSV. CE-E12B will additionally enforce a before/after equality check on `normalized_measure` / `dimension_score` / `composite_score`.
+
+## Database re-baseline constraint (informs CE-E12B, not touched here)
+
+`Data/Model/chia_v01.sqlite` sha-256 `0d8bb417ccf72acf0cef7d17bcca15627900d0df419fc259de553a95b9aa2966` is pinned by six backend test files (`test_ce_a06`, `test_ce_b01`, `test_ce_b02`, `test_ce_d01_concurrent_connection`, `test_ce_d01_county_reference_correction`, `test_ce_e09`); md5 `f53b3de17b627b3b02796df9de33b5a4` is the gate value. Any database change is a coordinated update of all seven anchors — the defining work of CE-E12B.
+
+## Verification
+
+Documentation-only change. Existing gate re-run and unchanged: frontend `vitest run` / `eslint --max-warnings 0` / `tsc && vite build`; backend `python -m unittest discover -s tests` 139/139; the five v0.1 analytical validators + `validate_v02_geographic_join.py` PASSED; `Data/Model/chia_v01.sqlite` md5 `f53b3de17b627b3b02796df9de33b5a4` and sha-256 `0d8bb417…a2966` unchanged; recorded processed-artifact hashes reproduce from the on-disk files; `git status` shows only the three Documentation files.
+
+## Status
+
+**Design recorded; CE-E12A complete pending commit authorization.** No executable change. CE-E12B (schema + `source` population + seven-anchor re-baseline) and CE-E13 (State/County selector reordering) are scoped but not started. Full design record: `Documentation/CE_E12A_Data_Vintage_Design.md.txt`; source catalogue: `Documentation/ANALYTICAL_DATA_SOURCES.md.txt`.
+
+---
+
 *This log serves as the historical record of significant project decisions, milestones, and direction. It documents not only what changed, but why those decisions were made.*

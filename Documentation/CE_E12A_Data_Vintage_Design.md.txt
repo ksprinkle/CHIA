@@ -1,0 +1,257 @@
+# CHIA County Explorer v0.2 — CE-E12A
+
+# Data Vintage & Source Refresh Foundation — Design Record
+
+**Slice:** CE-E12A (architecture / design; documentation only)
+**Date:** September 5, 2026
+**Baseline:** `ce-e11` / `691f2b7` — working tree clean, nothing pushed
+**Status:** design recorded; no code, schema, or data change in this slice
+
+---
+
+# 1. Objective
+
+Establish authoritative source-vintage metadata for the CHIA v0.1 analytical
+sources so the governing principle holds explicitly:
+
+> A CHIA profile must always be reproducible from a known set of source-data
+> vintages and a known methodology version.
+
+CE-E12A produces the design, the exact target values, and the migration plan.
+It changes nothing executable. The database/code change is the separately
+authorized follow-on slice **CE-E12B**.
+
+The concrete source catalogue (per-source vintage, URLs, artifact hashes) lives
+in `Documentation/ANALYTICAL_DATA_SOURCES.md.txt`, created by this slice.
+
+---
+
+# 2. Constraint that shapes the slice
+
+`Data/Model/chia_v01.sqlite` is byte-pinned:
+
+* `EXPECTED_PRODUCTION_SHA256 = 0d8bb417ccf72acf0cef7d17bcca15627900d0df419fc259de553a95b9aa2966`
+  is asserted by six backend test files — `test_ce_a06_county_explorer_validation.py`,
+  `test_ce_b01_county_api.py`, `test_ce_b02_county_explorer.py`,
+  `test_ce_d01_concurrent_connection.py`,
+  `test_ce_d01_county_reference_correction.py`,
+  `test_ce_e09_state_dimension_scores.py`.
+* md5 `f53b3de17b627b3b02796df9de33b5a4` is the value the CE validation gate checks.
+
+Any change to the database — data **or** schema — is a coordinated re-baseline of
+all seven anchors. That is out of scope for CE-E12A (documentation only) and is
+the defining work of CE-E12B.
+
+Verified: no analytical script reads the `source` table. `Data/Model/normalize_v01_database.py`,
+`build_v01_dimension_scores.py`, `build_v01_composite_scores.py`, and all five
+`validate_v01_*` scripts read only `observation`, `normalized_measure`,
+`dimension_definition`, `dimension_score`, `composite_score`, `county_period`,
+`methodology`. `source` is consumed only by
+`app/services/county_explorer.py :: _load_provenance` (presentation) and the
+CE-E11 per-county CSV. Populating source-vintage metadata therefore cannot alter
+any analytical value.
+
+---
+
+# 3. The seven determinations
+
+### 3.1 Should `county_period.period` become the user-facing data/reference period?
+
+**No.** `period` is the analytical-run partition key, coupled 1:1 to
+`methodology_version` in v0.1 (value `v0.1`) and asserted `== 'v0.1'` by
+`validate_v01_county_explorer.py` and the backend suite. Repurposing its value to
+a date would break the analytical gate and conflate methodology version with
+source vintage — the two things the governing principle keeps apart.
+
+`period` keeps its value. "Data vintage" is a **new derived presentational
+concept**, built from the per-source `reference_period` values, surfaced as a
+"Sources as of …" style block. The CountyPage label `Period` may be clarified to
+`Methodology period` so `v0.1` stops reading like a data date (CE-E12B, optional).
+
+### 3.2 How should `source.reference_period` represent each source's vintage?
+
+One human-readable, sortable string per `source` row:
+
+```
+<data store> snapshot <ISO-8601 date>
+```
+
+For every v0.1 source the value is **`HRSA Data Warehouse snapshot 2026-08-29`**
+(all four v0.1 sources are one HRSA Data Warehouse snapshot; every raw record
+carries a uniform `Data Warehouse Record Create Date` of 2026-08-29).
+`source.url` and `source.accessed_at` are populated alongside it.
+
+### 3.3 Minimum metadata to identify an exact source artifact reproducibly
+
+Per source: `source_name`, `publisher`, `dataset_name` (present today);
+`reference_period`, `url`, `accessed_at` (placeholder / NULL today); the exact
+build-input artifact **filename**; the artifact **SHA-256**; methodology linkage
+(already via `variable_definition.source_id` + `dimension_definition.methodology_version`).
+
+The content hash is the single highest-value addition for "reproducible from a
+known set of source-data vintages": it lets any environment prove it holds the
+same bytes the persisted database was built from. Filename + SHA-256 for all four
+build-input workbooks (and their upstream raw exports) are recorded now in
+`ANALYTICAL_DATA_SOURCES.md.txt`.
+
+### 3.4 Are schema changes actually necessary?
+
+* `reference_period` / `url` / `accessed_at` — **no**; the columns exist, only
+  data population is needed.
+* Artifact hash (and optional filename) — **yes, minimal**: one or two additive
+  **nullable `TEXT`** columns on `source` (`content_sha256`, optionally
+  `artifact_filename`). No index, FK, NOT NULL, or existing-column change;
+  invisible to every current query and validator.
+* Net: the schema change is 1–2 nullable columns, and it is **deferred to
+  CE-E12B** because it necessarily rewrites the byte-pinned database file.
+
+### 3.5 Exact files
+
+**CE-E12A (this slice — documentation only):**
+
+| File | Change |
+| --- | --- |
+| `Documentation/ANALYTICAL_DATA_SOURCES.md.txt` | new — authoritative source-vintage catalogue + reproducible artifact hashes |
+| `Documentation/CE_E12A_Data_Vintage_Design.md.txt` | new — this design record |
+| `Documentation/PROJECT_LOG.md.txt` | modified — CE-E12A entry |
+
+No `.py`, `.sql`, `.sqlite`, frontend, or test file is touched.
+
+**CE-E12B (future; separate authorization) — anticipated footprint:**
+
+* `Data/Model/schema.sql` — add `content_sha256 TEXT` (+ optional
+  `artifact_filename TEXT`) to `source`.
+* `Data/Model/seed_v01.sql` — real `reference_period` / `url` + new columns; drop
+  the `v0.1 source period` placeholder.
+* `Data/Model/build_v01_database.py` — align the `source_metadata` insert with the
+  seed; compute + insert the SHA-256 from `SOURCE_FILES`.
+* `Data/Model/migrate_v12_source_vintage.py` — new, scoped, transactional
+  `source`-only migration (pattern of the existing `_replace_county_reference`);
+  preferred over a full `build_v01_database.py` rebuild, which would hit the
+  documented MUA/P `dimension_score` regeneration gap.
+* Six `EXPECTED_PRODUCTION_SHA256` constants + the gate md5 — re-baselined
+  together.
+* `tests/test_ce_b02_county_explorer.py` — `source` fixture rows + coverage for
+  the new columns.
+* `tests/test_ce_e12_source_vintage.py` — new (see §6).
+* `app/schemas/explorer.py` (`SourceRef`), `app/services/county_explorer.py`
+  (`_load_provenance` SELECT + mapping).
+* `frontend/src/lib/types.ts` (`SourceRef`), `components/ProvenancePanel.tsx`,
+  `lib/countyCsv.ts` (`CSV_COLUMNS` + row builder), `test/harness.tsx` fixture,
+  and the affected `*.test.tsx`.
+* Optionally `frontend/src/pages/CountyPage.tsx` — `Period` → `Methodology
+  period` label + a "Data vintage" line.
+
+### 3.6 Exact tests / validation
+
+**CE-E12A** — the entire existing gate must remain untouched and green, proving
+nothing executable changed:
+
+* frontend `vitest run` (current count) · `eslint --max-warnings 0` ·
+  `tsc && vite build`
+* backend `python -m unittest discover -s tests` → 139 / 139
+* the five v0.1 analytical validators + `validate_v02_geographic_join.py`
+* `chia_v01.sqlite` md5 `f53b3de17b627b3b02796df9de33b5a4` **and** sha-256
+  `0d8bb417…a2966` unchanged
+* the recorded processed-artifact SHA-256s reproduce from the on-disk files
+  (snippet in `ANALYTICAL_DATA_SOURCES.md.txt`)
+* `git status` shows only the three Documentation files
+
+**CE-E12B** — new `tests/test_ce_e12_source_vintage.py`: every `source` row has
+non-null `reference_period` / `url` / `accessed_at` / `content_sha256`;
+`content_sha256` matches the on-disk build-input workbook; `reference_period`
+matches `ANALYTICAL_DATA_SOURCES.md.txt`; **explicit before/after equality of
+`normalized_measure.normalized_value`, `dimension_score.score`,
+`composite_score.composite_value`** against a pre-migration snapshot; all
+`validate_v01_*` pass unchanged; all seven database-hash anchors re-baselined in
+the same commit.
+
+### 3.7 How the change avoids changing any analytical value
+
+* CE-E12A touches no executable code or data — invariance is guaranteed and
+  proven by the unchanged md5 / sha-256.
+* CE-E12B is confined to (a) the `source` table's currently-NULL / placeholder
+  columns, (b) one or two new nullable `source` columns, (c) presentation-layer
+  passthrough of those fields. `dimension_score.score`,
+  `composite_score.composite_value`, and `normalized_measure.normalized_value`
+  are never written. `county_period.period` keeps value `v0.1`, so
+  `validate_v01_county_explorer.py` and every `period == 'v0.1'` assertion keep
+  passing. The CE-E12B test enforces analytical invariance with a before/after
+  diff rather than merely asserting it.
+
+---
+
+# 4. Reproducibility contract (target state, after CE-E12B)
+
+A persisted CHIA profile value is reproducible when all of the following are
+pinned and mutually consistent:
+
+1. **Methodology version** — `v0.1` — fixes normalization
+   (`county_percentile_rank_average`), dimension aggregation, and the
+   experimental equal-weight composite.
+2. **Source-data vintage** — `source.reference_period` =
+   `HRSA Data Warehouse snapshot 2026-08-29` for every contributing source,
+   with `source.url` and `source.accessed_at` populated.
+3. **Exact source bytes** — `source.content_sha256` matches the on-disk
+   build-input workbook; the value is recorded in
+   `ANALYTICAL_DATA_SOURCES.md.txt` and independently re-checkable.
+4. **Database identity** — `chia_v01.sqlite` sha-256 equals the re-baselined
+   `EXPECTED_PRODUCTION_SHA256`, tying the persisted analytical tables to a
+   single build of (1)+(3).
+
+CE-E12A satisfies (1) already and records (2) and (3) as documented targets with
+verifiable hashes. CE-E12B persists (2) and (3) into the database and
+re-establishes (4).
+
+---
+
+# 5. CE-E12B migration & re-baseline checklist (for the future slice)
+
+1. Add `source.content_sha256 TEXT` (+ optional `artifact_filename TEXT`) to
+   `schema.sql`.
+2. Update `seed_v01.sql` and `build_v01_database.py` to the target
+   `reference_period` / `url` / `accessed_at` and the new column(s); align the
+   two placeholders.
+3. Write `migrate_v12_source_vintage.py` — transactional, `source`-only:
+   snapshot `normalized_measure` / `dimension_score` / `composite_score`, apply
+   the `source` updates + `ALTER TABLE ... ADD COLUMN`, re-check the three
+   analytical snapshots are byte-identical, `PRAGMA foreign_key_check`, commit or
+   roll back.
+4. Run the migration against `chia_v01.sqlite`; record the new md5 / sha-256.
+5. Re-baseline all seven anchors in one commit: the six
+   `EXPECTED_PRODUCTION_SHA256` constants + the gate md5.
+6. Add `tests/test_ce_e12_source_vintage.py` (§3.6).
+7. Extend `SourceRef` (backend + frontend), `_load_provenance`,
+   `ProvenancePanel`, `countyCsv` `CSV_COLUMNS`, `harness.tsx`, affected tests.
+8. Run the full gate: frontend vitest / eslint / build; backend unittest
+   (expect 139 + the new E12 tests); the five v0.1 validators + the geo
+   validator; confirm `validate_v01_*` output unchanged.
+9. Update `ANALYTICAL_DATA_SOURCES.md.txt` "Today vs. Target" section to reflect
+   the applied state and record the new database digests.
+
+---
+
+# 6. Open decisions (recommended dispositions; confirm before CE-E12B)
+
+| # | Decision | Recommendation |
+| --- | --- | --- |
+| Q-D1 | `county_period.period` stays `v0.1`; "data vintage" is a new derived presentational concept from per-source `reference_period` | **Yes** |
+| Q-D2 | Store the exact build-input **filename** in-DB (`source.artifact_filename`) in addition to `content_sha256`, vs. filename in the doc only | **Both columns** — the row becomes self-describing |
+| Q-D3 | CE-E12B mechanism: scoped transactional `source`-only migration vs. full DB rebuild | **Scoped migration** — a rebuild risks the documented MUA/P `dimension_score` regeneration gap |
+| Q-D4 | CE-E12A also commits a tiny read-only `Data/Model/verify_source_artifacts.py`, vs. staying pure docs | **Pure docs** — the verification snippet is embedded in `ANALYTICAL_DATA_SOURCES.md.txt`; a committed script can be added in CE-E12B |
+| Q-D5 | Exact per-export HRSA deep-link URL; sourcing the extract date | Extract date resolved: **2026-08-29** (uniform `Data Warehouse Record Create Date`). Deep-link URL: confirm against `https://data.hrsa.gov/data/download` at CE-E12B population time |
+| Q-D6 | State/County selector reordering: separate slice vs. bundled into CE-E12 | **Separate slice (CE-E13)** — different subsystem, different test surface, revises the CE-C02 global-selector contract; no dependency on CE-E12 |
+
+---
+
+# 7. CE-E12A change attestation
+
+* Files changed: `Documentation/ANALYTICAL_DATA_SOURCES.md.txt` (new),
+  `Documentation/CE_E12A_Data_Vintage_Design.md.txt` (new),
+  `Documentation/PROJECT_LOG.md.txt` (CE-E12A entry appended).
+* No `.py`, `.sql`, `.sqlite`, frontend, or test file modified.
+* `Data/Model/chia_v01.sqlite` — md5 `f53b3de17b627b3b02796df9de33b5a4`,
+  sha-256 `0d8bb417ccf72acf0cef7d17bcca15627900d0df419fc259de553a95b9aa2966` —
+  unchanged.
+* The existing test / validator gate is unaffected by documentation-only changes;
+  verification results are reported with the slice.
