@@ -7,6 +7,10 @@ import type { SupportingEvidenceItem } from '../lib/types'
  * (governing specification section 12 / 13). Renders API-provided values
  * verbatim: it never alters the dimension score, and evidence `raw_value` is
  * shown as provided (no rounding, no precision policy).
+ *
+ * CE-E11: each item also shows its persisted `variable_id` (a stable machine
+ * identifier) alongside the human `display_name`, so a reader can trace the
+ * exact variable a supporting figure came from.
  */
 export function SupportingEvidence({
   items,
@@ -30,6 +34,7 @@ export function SupportingEvidence({
           {items.map((item) => (
             <li key={item.variable_id} className="evidence__item">
               <span className="evidence__name">{item.display_name}</span>
+              <code className="evidence__variable">{item.variable_id}</code>
               <span className="evidence__value">
                 {item.raw_value === null
                   ? 'Not reported'

@@ -1,5 +1,6 @@
 import { Link, useParams } from 'react-router-dom'
 
+import { CountyDataExport } from '../components/CountyDataExport'
 import { ErrorState } from '../components/ErrorState'
 import { ExperimentalComposite } from '../components/ExperimentalComposite'
 import { Interpretation } from '../components/Interpretation'
@@ -237,8 +238,17 @@ function DimensionProvenance({ source }: { source: SourceRef | null }) {
   return (
     <div className="dimension-provenance">
       <h4 className="dimension-provenance__heading">Provenance</h4>
+      <p className="dimension-provenance__lead">
+        The source value above is drawn from this dataset.
+      </p>
       <p className="dimension-provenance__name">{source.source_name}</p>
       <dl className="dimension-provenance__meta">
+        <div>
+          <dt>Source ID</dt>
+          <dd>
+            <code>{source.source_id}</code>
+          </dd>
+        </div>
         {source.publisher ? (
           <div>
             <dt>Publisher</dt>
@@ -344,7 +354,13 @@ function DimensionCard({
             <dd>{primaryMeasure.display_name}</dd>
           </div>
           <div>
-            <dt>Reported value</dt>
+            <dt>Variable</dt>
+            <dd>
+              <code>{primaryMeasure.variable_id}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>Source value</dt>
             <dd>
               {primaryMeasure.raw_value === null
                 ? 'Not reported'
@@ -355,8 +371,14 @@ function DimensionCard({
           </div>
           {primaryMeasure.normalized_value !== null ? (
             <div>
-              <dt>Percentile value</dt>
-              <dd>{formatScore(primaryMeasure.normalized_value)}</dd>
+              <dt>Normalized value</dt>
+              <dd>{primaryMeasure.normalized_value}</dd>
+            </div>
+          ) : null}
+          {hasScore ? (
+            <div>
+              <dt>Dimension score</dt>
+              <dd>{score}</dd>
             </div>
           ) : null}
           {primaryMeasure.quality_flag ? (
@@ -473,6 +495,7 @@ function CountyProfile({ stateFips }: { stateFips: string }) {
         sources={provenance.sources}
         accessProfile={accessProfile}
       />
+      <CountyDataExport data={explorer.data} />
     </section>
   )
 }

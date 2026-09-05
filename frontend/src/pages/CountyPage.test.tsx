@@ -133,10 +133,20 @@ describe('CountyPage (CE-C03 county profile)', () => {
     // CE-E04's snapshot section legitimately also renders the rounded score,
     // so these are scoped to the dimensions detail region specifically.
     const dimensions = screen.getByRole('region', { name: /access dimensions/i })
-    // 88.757... -> 89 and 12.4 -> 12 (presentation only; not recalculated)
-    expect(within(dimensions).getByText('89')).toBeInTheDocument()
-    expect(within(dimensions).getByText('12')).toBeInTheDocument()
+    // The headline Result rounds for display (88.757... -> 89); nothing is
+    // recalculated.
+    expect(
+      within(dimensions).getByText('89', { selector: '.dimension__score-value' }),
+    ).toBeInTheDocument()
     expect(within(dimensions).getAllByText('County percentile rank')).toHaveLength(3)
+    // CE-E11: the drill-down shows the exact, unrounded pipeline values.
+    const primaryCareCard = within(dimensions)
+      .getByRole('heading', { level: 3, name: 'Primary Care Access' })
+      .closest('li') as HTMLElement
+    expect(within(primaryCareCard).getByText('12.4')).toBeInTheDocument()
+    expect(
+      within(primaryCareCard).getByText('88.75776397515529'),
+    ).toBeInTheDocument()
   })
 
   it('qualifies the MUA/P score as not percentile-normalized', async () => {
@@ -1467,5 +1477,134 @@ describe('CountyPage (CE-E06 measure exploration & drill-down)', () => {
     expect(summary.tagName).toBe('SUMMARY')
     expect(summary.closest('details')).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+})
+
+describe('CountyPage (CE-E11 provenance labeling + CSV export)', () => {
+  function primaryCareItem(): HTMLElement {
+    return screen
+      .getByRole('heading', { level: 3, name: 'Primary Care Access' })
+      .closest('li') as HTMLElement
+  }
+
+  it('shows the primary variable id alongside the display name in the drill-down', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const details = within(primaryCareItem()).getByText(
+      'Investigate Primary Care Access',
+    ).closest('details') as HTMLElement
+    expect(
+      within(details).getByText('Primary Care Access primary measure'),
+    ).toBeInTheDocument()
+    expect(
+      within(details).getByText('PC_HPSA_GEOGRAPHIC_COVERAGE', { selector: 'code' }),
+    ).toBeInTheDocument()
+  })
+
+  it('presents the source -> normalized -> score chain with exact (unrounded) values', async () => {
+    stubApi({
+      counties: makeCounties(['01001']),
+      explorer: (fips) =>
+        makeExplorer(fips, {
+          dimensions: {
+            primary_care: {
+              score: 63.4179104477612,
+              primary_measure: {
+                raw_value: 12.5,
+                unit: 'percent',
+                normalized_value: 63.4179104477612,
+              },
+            },
+          },
+        }),
+    })
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const details = within(primaryCareItem()).getByText(
+      'Investigate Primary Care Access',
+    ).closest('details') as HTMLElement
+
+    const labels = within(details)
+      .getAllByRole('term')
+      .map((dt) => dt.textContent)
+    expect(labels).toEqual(
+      expect.arrayContaining([
+        'Primary measure',
+        'Variable',
+        'Source value',
+        'Normalized value',
+        'Dimension score',
+      ]),
+    )
+    // Source value keeps its verbatim raw form; normalized value and score are
+    // exact, not the rounded figures shown in the headline Result.
+    expect(within(details).getByText('12.5 percent')).toBeInTheDocument()
+    expect(within(details).getAllByText('63.4179104477612')).toHaveLength(2)
+    expect(within(details).queryByText('63')).toBeNull()
+  })
+
+  it('labels the dimension-scoped provenance with the source id and a linking sentence', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const details = within(primaryCareItem()).getByText(
+      'Investigate Primary Care Access',
+    ).closest('details') as HTMLElement
+    expect(
+      within(details).getByText(/the source value above is drawn from this dataset/i),
+    ).toBeInTheDocument()
+    expect(within(details).getByText('Primary Care HPSA')).toBeInTheDocument()
+    expect(within(details).getByText('1', { selector: 'code' })).toBeInTheDocument()
+  })
+
+  it('shows each supporting-evidence variable id', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const details = within(primaryCareItem()).getByText(
+      'Investigate Primary Care Access',
+    ).closest('details') as HTMLElement
+    expect(
+      within(details).getByText('PC_HPSA_GEOGRAPHIC_COVERAGE_SUP_1', { selector: 'code' }),
+    ).toBeInTheDocument()
+  })
+
+  it('renders the CSV export section after the page-level Sources panel, always visible', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    const sources = screen.getByRole('region', { name: /sources/i })
+    const exportRegion = screen.getByRole('region', { name: /county data export/i })
+    expect(
+      sources.compareDocumentPosition(exportRegion) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+
+    const button = within(exportRegion).getByRole('button', {
+      name: "Download this county's data (CSV)",
+    })
+    // Not nested inside any collapsed <details>.
+    expect(button.closest('details')).toBeNull()
+  })
+
+  it('preserves the CE-E06 collapsed-disclosure behavior (each dimension still starts closed)', async () => {
+    stubValidCounty()
+    renderApp(['/counties/01001'])
+    await screen.findByRole('heading', { level: 1 })
+
+    for (const name of [
+      'Primary Care Access',
+      'Dental Access',
+      'Mental Health Access',
+      'MUA/P Access',
+    ]) {
+      const summary = screen.getByText(`Investigate ${name}`)
+      expect((summary.closest('details') as HTMLDetailsElement).open).toBe(false)
+    }
   })
 })
