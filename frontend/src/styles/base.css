@@ -84,6 +84,22 @@ body {
   top: var(--space-2);
 }
 
+/* CE-E07: visually hidden but exposed to assistive technology (used by the
+   Layout route-change announcer). Not focusable and never revealed -- unlike
+   .skip-link, which is a hidden-until-focused interactive element. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
 .app-shell {
   min-height: 100vh;
   display: flex;

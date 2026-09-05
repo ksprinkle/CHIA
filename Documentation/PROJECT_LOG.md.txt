@@ -159,4 +159,116 @@ Geographic foundation complete. No database, schema, API, or analytical change. 
 
 ---
 
+# Version 0.2.0 — County Explorer v0.2 UX: U.S. Map Landing (CE-E02)
+
+**Date:** September 4, 2026
+
+## Scope
+
+Replaced the text-first landing state with the U.S. map as the primary navigation surface (specification §4, §14 CE-E02). `HomePage` now renders `UsStateMap` (the CE-E01 committed `us-states.topojson`, rendered with `react-simple-maps`) alongside `StateSelect`, the required accessible non-map alternative (§9.2). Both derive their state list from a single `deriveStates(directory.counties)` helper (`lib/states.ts`), so the map and the selector can never disagree about which states exist. Added the `/states/:stateFips` route. The existing global `CountySelector` remains on every route.
+
+## Dependencies
+
+`react-simple-maps` 3.0.0 (runtime) and `@types/react-simple-maps` 3.0.6 (dev) added — the only new frontend dependency in the CE-E series. No backend/API/database/analytical change.
+
+## Tests
+
+`UsStateMap`, `StateSelect`, `StatePage`, and `states` derivation tests added; routing tests extended for map↔selector URL parity. Test fetch harness fixed to return genuine `Promise<Response>` (react-simple-maps chains `fetch(url).then(...)`).
+
+## Status
+
+Complete. Gate met: a user can reliably select any supported state via the map or the accessible selector.
+
+---
+
+# Version 0.2.0 — County Explorer v0.2 UX: State County Map (CE-E03)
+
+**Date:** September 4, 2026
+
+## Scope
+
+After state selection, `StatePage` renders `StateCountyMap` (the CE-E01 committed per-state `counties/<state_fips>.topojson`) plus `CountySelectForState`, a dedicated state-scoped accessible county selector (§5, §14 CE-E03). Both consume a single `deriveCountiesForState(directory.counties, stateFips)` helper (`lib/counties.ts`). County names are presented with state context already established, resolving the duplicate-county-name problem. The map is fit to the selected state's counties using only `react-simple-maps`' own `path` — no new projection/geometry dependency. Geometry↔directory joins are by FIPS, never by name. No new route.
+
+## Tests
+
+`StateCountyMap`, `CountySelectForState`, and `deriveCountiesForState` tests added; routing tests extended for county map↔selector parity. No new dependency.
+
+## Status
+
+Complete. Gate met: a user can select any supported county within the selected state.
+
+---
+
+# Version 0.2.0 — County Explorer v0.2 UX: Visual County Profile (CE-E04)
+
+**Date:** September 4, 2026
+
+## Scope
+
+Redesigned the text-heavy County Profile (§6, §8, §14 CE-E04) around a visual hierarchy: geographic breadcrumb (`United States → State → County`), county identity header, a compact four-dimension "Healthcare access snapshot", the access-dimension detail, the CE-C05 "What Stands Out?" interpretation, the clearly-labelled experimental composite, and methodology/provenance moved behind collapsed native `<details>` disclosures (progressive disclosure, §6.10/§6.11/§8). Added a display-only misleading-rounding fix for the experimental composite (a stored ~0.45 no longer renders as a bare "0"; §6.12). No analytical logic, interpretation rules, or API payloads changed.
+
+## Tests
+
+`CountyPage` test suite extended (breadcrumb, snapshot, disclosure collapse, composite rounding); two pre-existing CE-C03 assertions rescoped to the dimensions region due to legitimate new duplicate text. No new dependency.
+
+## Status
+
+Complete. Gate met: county results are understandable without reading large blocks of text.
+
+---
+
+# Version 0.2.0 — County Explorer v0.2 UX: Visualization Layer (CE-E05)
+
+**Date:** September 4, 2026
+
+## Scope
+
+Added per-dimension visual indicators to the snapshot (§7, §12, §14 CE-E05): a fixed-size position **marker on a 0–100 track** for the three percentile dimensions (`PercentileIndicator`) and a visually distinct **filled coverage bar** for MUA/P (`CoverageIndicator`) — never the same widget or scale, so MUA/P geographic coverage is never implied to be a percentile. Indicators are `aria-hidden` decoration; the existing numeric value + unit text remains the accessible source of truth. A genuine 0th percentile stays visible (the marker is a fixed-size element regardless of position); unavailable dimensions render no indicator. No charting library was added. Placement confined to the snapshot; `DimensionCard` left intact.
+
+## Tests
+
+`CountyPage` suite extended with a CE-E05 block (indicator presence, boundary positions 0%/100%, percentile-vs-coverage widget distinction, decorative/aria-hidden, zero-vs-missing). No new dependency.
+
+## Status
+
+Complete. Gate met: visualizations accurately represent the underlying values and introduce no misleading comparisons.
+
+---
+
+# Version 0.2.0 — County Explorer v0.2 UX: Measure Exploration & Drill-Down (CE-E06)
+
+**Date:** September 4, 2026
+
+## Scope
+
+Made each dimension progressively investigable (§6.7, §8.3, §14 CE-E06). The dimension Result (name, description, score, qualifier, CE-E05 indicator) stays visible; the analytical trail — underlying/source-measure data, supporting evidence, dimension-scoped methodology (`DimensionProfile.calculation_method` + primary-measure `normalization_method`), and dimension-scoped provenance (the single source identified by `DimensionProfile.source_id`) — moves behind one independent native `<details>` per dimension (`Investigate {dimension name}`). No accordion behaviour; the `<details>` `open` attribute is the only state (no React state, route, or URL change). The page-level `MethodologyPanel` / `ProvenancePanel` remain as the comprehensive reference view. No backend/type/analytical change.
+
+## Tests
+
+`CountyPage` suite extended with a CE-E06 block (12 cases): per-dimension disclosure, default-visible content, evidence/methodology/provenance correctly scoped and never mixed across dimensions, independent open/close, zero/missing/percentile/coverage semantics preserved, native `<details>` accessibility. No new dependency.
+
+## Status
+
+Complete. Gate met: the complete analytical trail remains accessible without overwhelming the primary interface.
+
+---
+
+# Version 0.2.0 — County Explorer v0.2 UX: Accessibility & Responsive Validation (CE-E07)
+
+**Date:** September 5, 2026
+
+## Scope
+
+Consolidated accessibility and responsive validation for the CE-E02–CE-E06 map-first redesign (§9, §14 CE-E07). This is a validation slice; its one functional change is a screen-reader **route-change announcement**: a single visually-hidden polite live region in `Layout` (`aria-live="polite"`, no `role`) that announces the geographic context of each client-side navigation ("Viewing {state}" / "Viewing {county}, {state}"), derived read-only from the URL plus the loaded county directory. Closes the §9.4 gap where SPA navigation swapped the page `<h1>` silently. Added a `.visually-hidden` CSS utility used only by that region.
+
+## Validation
+
+14 consolidated automated accessibility tests added in `frontend/src/accessibility.test.tsx` (map↔accessible-selector parity at both geographic levels; route-announcer behaviour incl. back navigation; CE-E06 drill-down keyboard/native-semantics; colour-independent dimension values; single-h1/main-landmark/named-region structure on all three screens). Stale "no custom keyboard handling anywhere" comment corrected (CE-E02/E03 map SVG features use an explicit `onKeyDown`). Full frontend suite 180/180 green; `npm run lint` clean; `tsc && vite build` clean; backend suite and CE-E01 geographic validator unaffected and green. Real-browser / screen-reader / on-device checks (which this environment cannot execute) are defined as an execution-ready checklist in `Documentation/CE_E07_Accessibility_Responsive_Validation.md.txt`, for CE-E08. §7 analytical-map / measure-selector / choropleth / legend / tooltip functionality is explicitly recorded as **not part of the §14 baseline** and therefore N/A for those §9 clauses.
+
+## Status
+
+Complete. No new dependencies, no browser-automation tooling, no backend/API/database/analytical/geographic change, no tablet redesign. Gate (accessible alternative paths provide equivalent substantive information) met at the architecture and automated-test level; real-browser/AT/device sign-off is handed to CE-E08 as a defined checklist.
+
+---
+
 *This log serves as the historical record of significant project decisions, milestones, and direction. It documents not only what changed, but why those decisions were made.*

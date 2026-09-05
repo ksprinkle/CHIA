@@ -1,0 +1,327 @@
+# CHIA County Explorer v0.2 UX — CE-E07 Accessibility & Responsive Validation
+
+**Slice:** CE-E07 — Accessibility & Responsive Validation
+**Governing specification:** `Documentation/CHIA_County_Explorer_UX_v0.2_Implementation_Specification.md`, §14 (CE-E07) and §9 (Accessibility & Responsive Design), with §7.12 / §12.12 (accessible alternatives).
+**Baseline:** `ce-e06` (`cb8619a1373419e7878e646b8756a19e20789421`).
+**Date:** 2026-09-05
+
+CE-E07 gate (verbatim): *"Accessible alternative paths provide equivalent substantive information."*
+
+CE-E07 is a **validation slice**. It does not add product features. The one
+functional change it carries is a screen-reader route-change announcement
+(§9.4), which closed a genuine accessible-equivalence gap rather than merely
+being documented. Everything else in CE-E07 is test consolidation and this
+record.
+
+---
+
+## 1. Relationship to CE-C06
+
+CE-C06 (`ce-c06`, "accessibility and responsive validation") validated the
+CE-C-series text County Profile. CE-E07 re-validates the **map-first
+redesign** delivered by CE-E02–CE-E06 (U.S. map landing, state county map,
+visual county profile, CE-E05 visual indicators, CE-E06 per-dimension
+drill-down) and the cumulative experience. CE-C06's guarantees for the
+native-control profile still hold and are covered by its own tests; this
+document does not restate them except where CE-E-series work changed the
+surface.
+
+---
+
+## 2. Method and environment
+
+| Channel | Available | Used for |
+|---|---|---|
+| Vitest + jsdom automated suite (`css: false`) | yes | DOM/semantic structure, control types, focusability, document order, map↔selector parity, live-region behaviour, colour-independent values |
+| ESLint `jsx-a11y/recommended` (`npm run lint`) | yes | static accessibility rule enforcement across all `.tsx` |
+| TypeScript `tsc` + `vite build` | yes | build integrity |
+| Real browser (Chromium/Firefox/WebKit) at desktop/tablet/mobile viewports | **no** — no browser automation is installed and none was added (per approved scope) | see §6 checklist (execution-ready, pending a human validator) |
+| Screen readers (NVDA / JAWS / VoiceOver) | **no** — no AT is available in this environment | see §6 checklist |
+| Physical touch devices | **no** | see §6 checklist |
+| `prefers-reduced-motion` / `@media` evaluation | **no** — jsdom has no layout engine and the test runner loads no CSS | code audit in §5.9 + §6 checklist |
+
+**Consequently:** every item below marked **VERIFIED** is proven by the
+automated suite and/or direct source audit and is definitive. Every item
+marked **CODE-AUDIT** is a reasoned conclusion from the source and the spec
+but has an associated real-browser/AT check listed in §6 that a human
+validator must execute to fully close the CE-E07 gate for CE-E08 sign-off.
+No screen-reader, real-browser, or on-device result in this document is
+asserted as "passed" — those are presented as a defined test plan.
+
+Automated coverage added by CE-E07: 14 test cases in
+`frontend/src/accessibility.test.tsx` (`describe('CE-E07 accessibility &
+responsive validation')`). Full frontend suite after CE-E07: 180 passing
+across 17 files. `npm run lint` clean. `tsc && vite build` clean.
+
+---
+
+## 3. §7 analytical-map capability — NOT APPLICABLE to this baseline
+
+§7 ("Measure Exploration & Visualization") describes a measure selector,
+measure-driven analytical map colouring (choropleth), map legends (§7.6),
+and map tooltips (§7.10). **§14 allocates no implementation slice to build
+any of it, and CE-E02–CE-E06 did not build it.** The CE-E02 U.S. map and the
+CE-E03 state county map are *navigation choosers only*: every geography has
+identical neutral styling and carries no analytical value. CE-E05 shipped
+deliberately with no measure selector (asserted by its own test suite).
+
+Therefore the following §9 clauses are **N/A for the v0.2 §14 baseline**
+because their subject does not exist in the product:
+
+- §9.5 analytical-map colour scales / choropleth colour independence
+- §7.6 map legends
+- §9.6 / §12.12 *map-choropleth* accessible alternative (the four-dimension
+  **profile** comparison alternative is in scope and is satisfied — see §5.5)
+- §7.10 / §7.13 map tooltip semantics and cross-surface measure consistency
+
+This is a §7-vs-§14 specification inconsistency, recorded here for a future
+roadmap decision. CE-E07 does not implement §7 functionality.
+
+---
+
+## 4. Functional change delivered by CE-E07
+
+**SPA route-change announcement (`frontend/src/components/Layout.tsx`).**
+A single stable, visually-hidden **polite live region** (`aria-live="polite"
+aria-atomic="true"`, no `role` — so it is not a discoverable landmark and
+does not collide with the genuine `role="status"` loading/not-found
+messages) is rendered once in the app shell. On client-side navigation it
+announces the geographic context of the destination view:
+
+- `/` → (no announcement on first load; transitions only)
+- `/states/:fips` → `"Viewing {state name}"`
+- `/counties/:fips` → `"Viewing {county name}, {state name}"`
+
+The label is derived **read-only** from the URL plus the already-loaded
+county directory (`useCountyDirectory`). No new application state, no route
+or URL changes, no page-component changes. It degrades to silence for any
+unrecognized path or before the directory resolves. Rationale: §9.4 requires
+a screen-reader user to be able to determine the current geographic
+location; client-side navigation swaps the page `<h1>` without moving focus
+or reloading, so AT was previously silent on a state/county transition.
+
+CSS: one new `.visually-hidden` utility class in
+`frontend/src/styles/base.css` (standard clip pattern), used only by this
+live region.
+
+Automated coverage: live region exists and starts empty; is not a `status`
+landmark; announces the state after a U.S.-map selection; announces
+`"county, state"` after a county-map selection; re-announces the prior
+context on back navigation.
+
+---
+
+## 5. Requirement-by-requirement result
+
+### 5.1 Map alternatives — §9.2, and the CE-E07 gate — VERIFIED
+
+Every geographic selection available on a map is available through a native
+`<select>` that reaches the identical route:
+
+- U.S. level: `UsStateMap` and `StateSelect` both derive their list from
+  `deriveStates(directory.counties)` — a single source. Automated test
+  asserts the set of selectable map states **equals** the set of selector
+  options (and both equal the expected states).
+- State level: `StateCountyMap` and `CountySelectForState` both derive from
+  `deriveCountiesForState(directory.counties, stateFips)` — a single source.
+  Automated test asserts map-county set **equals** selector-option set.
+- The global `CountySelector` (all counties, national) remains present on
+  every route as a third, always-available path.
+
+The `<select>` alternatives are part of the same page, not a separate
+"accessibility version" (§9.2). **Gate condition met at the architecture and
+automated-test level.** Real-browser confirmation of the selector's
+operability with a screen reader is in §6.
+
+### 5.2 Keyboard navigation — §9.3 — VERIFIED (structure) + CODE-AUDIT (real-browser)
+
+- All controls are native (`<a>`, `<select>`, `<button type="button">`,
+  `<details>/<summary>`) **except** the SVG map features, which are
+  `<path role="button" tabIndex={0}>` with an explicit `onKeyDown`
+  activating on Enter/Space (the browser gives an SVG `<path>` no default
+  activation). Covered by `UsStateMap` / `StateCountyMap` component tests.
+- Automated: skip link, county selector, `<main>`, retry button,
+  "Return to the start" link, supporting-evidence `<summary>`, and the
+  CE-E06 "Investigate {dimension}" `<summary>` are all genuine native,
+  focusable elements in a sensible document order; the CE-E06 disclosure
+  toggles on activation; breadcrumb entries are real `<a href>`.
+- Focus visibility: global `:focus-visible { outline: 3px solid
+  var(--color-focus); outline-offset: 2px }`; map features have a dedicated
+  `:focus-visible` fill. **Real-browser confirmation of ring visibility on
+  every background and full Tab traversal order is in §6** (jsdom cannot
+  paint or compute focus rings).
+
+### 5.3 Screen readers — §9.4 — VERIFIED (semantics) + live region added + CODE-AUDIT (AT run)
+
+- Landmarks: `<main id="main-content">`, `<nav aria-label="County
+  selection">`, `<nav aria-label="Breadcrumb">`, and `aria-labelledby`
+  sections (`home`, `state-page`, `county-profile`, `snapshot`,
+  `dimensions`, `methodology`, `sources`, composite, interpretation).
+  Automated: each of `/`, `/states/01`, `/counties/01001` exposes exactly
+  one `<h1>`, the `<main>` landmark, and at least one named region.
+- Values, interpretation, availability, and drill-down actions are all
+  rendered as real text / native disclosures (no canvas, no image-only
+  data). CE-E05 indicators are `aria-hidden` with the authoritative value +
+  unit as adjacent text.
+- Breadcrumb marks the current page with `aria-current="page"`.
+- **New in CE-E07:** the route-change live region (§4) announces the
+  geographic context on navigation.
+- **Requires an AT run (§6):** actual NVDA/JAWS/VoiceOver read-through of
+  the three primary screens and the CE-E06 drill-down, including
+  verification that the live region is announced once (and only once) per
+  transition and not on initial load.
+
+### 5.4 Colour independence — §9.5 (non-map) — VERIFIED
+
+- Automated: on the snapshot, every dimension's numeric value and its unit
+  (`"percentile"` / `"% coverage"`) render as plain text; all
+  `.percentile-indicator` / `.coverage-indicator` elements carry
+  `aria-hidden="true"`.
+- Automated: a genuine `0` renders as the text `"0"` while an unavailable
+  dimension renders the text `"Not available"` — the distinction is textual,
+  not colour (§6.13 / §7.8 continuity).
+- Maps carry no data-driven colour (see §3), so §9.5's analytical-map clause
+  is N/A.
+
+### 5.5 Chart / visual alternatives — §9.6, §12.12 — VERIFIED
+
+The four-dimension comparison is itself a semantic list (name + value +
+unit per dimension); the CE-E05 indicators are decorative supplements, not
+the information carrier. The CE-E06 drill-down exposes source value,
+normalized value, and score as `<dl>` text. No parallel data table is
+required because the "chart" is already structured text.
+
+### 5.6 Responsive — §9.7–§9.9 — CODE-AUDIT (real-browser viewport pass required)
+
+- Current CSS: single-column flow within a `max-width: 960px` container;
+  SVG maps `width: 100%; height: auto`; one breakpoint
+  `@media (max-width: 600px)` (reduced padding, full-width selectors,
+  smaller score value). Information hierarchy (Geography → Measure →
+  Finding → Detail) is identical at all widths — §9.9 satisfied by
+  construction.
+- **Not yet demonstrated in a real browser:** rendering at ~768px (tablet)
+  and ~375px (mobile) — no horizontal overflow, readable map, no
+  overlapping controls, "reorganize rather than shrink" (§9.7). See §6.
+- Per approved CE-E07 scope: **no tablet breakpoint or layout redesign is
+  added** unless the §6 viewport pass finds a concrete usability defect, in
+  which case a targeted fix returns for separate approval.
+
+### 5.7 Mobile geographic experience — §9.8 — CODE-AUDIT
+
+- SVG maps scale to container width; the accessible `<select>` widens to
+  full width below 600px and is the practical primary mobile path.
+- **Requires an on-device / emulated check (§6):** touch-target size of
+  county `<path>` elements on small-state maps, and prominence of the
+  `<select>` alternative when a map target is small.
+
+### 5.8 Touch interaction / no hover-only information — §9.10 — VERIFIED
+
+- Automated: map features expose their name via `aria-label` (e.g.
+  `"Select Alabama"`) and carry **no `title` attribute**; there is no
+  hover-only essential content anywhere in the app. Map `:hover` only
+  changes a decorative fill.
+- CE-E05/CE-E06 deliberately shipped with **no hover tooltip**.
+- **Requires an on-device check (§6):** touch-target dimensions meet a
+  usable minimum; tap activation of map features and disclosures.
+
+### 5.9 Reduced motion — §9.11 — CODE-AUDIT
+
+- `frontend/src/styles/base.css` contains
+  `@media (prefers-reduced-motion: reduce)` neutralising `animation-*` and
+  `transition-*` durations globally (`0.001ms !important`).
+- The application ships **negligible motion**: no route transitions, no
+  animated map zoom (a static SVG transform), and the only animation is the
+  CSS loading spinner (which the media query stops).
+- jsdom cannot evaluate the media query and the test runner loads no CSS, so
+  this is not automated. **Real-browser check with the OS "reduce motion"
+  setting enabled is in §6.**
+
+### 5.10 Defined loading / success / no-data / missing / error / invalid states — §13.10 — VERIFIED
+
+`HomePage`, `StatePage`, and `CountyPage` each define Loading
+(`role="status" aria-live="polite"`), Error (`role="alert"` + native retry
+`<button>`), and NotFound (`role="status"`, distinct from error) states;
+`CountyPage` additionally distinguishes `notfound` from `error` and renders
+incomplete-period data without fabricating values; a malformed FIPS short-
+circuits to NotFound with no network request. Covered by the existing
+CE-C03/C04/E02/E03 suites.
+
+---
+
+## 6. Manual validation checklist (execution-ready — pending a human validator)
+
+Environment required: a real browser (Chromium + Firefox + WebKit
+recommended), a screen reader (NVDA on Windows and/or VoiceOver on
+macOS/iOS), and either a physical phone/tablet or the browser device
+emulator. Run against `npm run dev` or `npm run preview` of the CE-E07
+build.
+
+### 6.1 Keyboard (all three screens + drill-down)
+- [ ] Tab from page load reaches, in order: skip link → State selector (home) / county-in-state selector (state) → global County selector → map features → in-page links/disclosures.
+- [ ] Skip link is visible on focus and moves focus into `<main>`.
+- [ ] Every map state/county is reachable by Tab and activates on **Enter** and on **Space** (navigates).
+- [ ] Focus ring is clearly visible on every control against its background (light surface, white, focus-blue map fill).
+- [ ] CE-E06 "Investigate {dimension}" and the nested "Supporting evidence" disclosures open/close on Enter/Space; focus stays on the summary.
+- [ ] No keyboard trap anywhere; Shift+Tab reverses cleanly.
+
+### 6.2 Screen reader
+- [ ] Home: heading, "Map of the United States" group, and "State" combobox are all announced; choosing a state via the combobox navigates and the live region announces "Viewing {state}".
+- [ ] Selecting a state on the **map** announces "Viewing {state}" once (not twice, not on load).
+- [ ] State page: state `<h1>`, "County map" group, "County in {state}" combobox announced; selecting a county announces "Viewing {county}, {state}".
+- [ ] County profile: breadcrumb reads "United States, {state}, {county} current page"; snapshot reads each dimension name + value + unit; indicators are silent (aria-hidden); "Investigate {dimension}" is announced as a collapsed disclosure and its expanded content (underlying data, evidence, methodology, provenance) is reachable.
+- [ ] Loading, error, and not-found messages are announced via their live roles.
+- [ ] Back navigation re-announces the prior geographic context.
+
+### 6.3 Responsive (desktop ~1280px, tablet ~768px, mobile ~375px)
+- [ ] No horizontal page scroll at any width.
+- [ ] Maps remain legible; SVG scales without clipping controls or text.
+- [ ] Selectors and the profile remain readable and usable; content reflows (does not merely shrink) — §9.7.
+- [ ] Information order stays Geography → Finding → Detail at every width — §9.9.
+- [ ] Record any concrete defect (overflow, overlap, unreadable map, unreachable control) for a separate targeted fix.
+
+### 6.4 Touch (physical device or emulator)
+- [ ] Map state/county features are tappable; if a small-state county target is hard to hit, the "County in {state}" `<select>` is an obvious, adjacent alternative.
+- [ ] Disclosures and links have comfortably tappable targets.
+- [ ] Nothing requires hover to reveal essential information.
+
+### 6.5 Reduced motion
+- [ ] With the OS "reduce motion" preference enabled, the loading spinner does not animate and no transition/animation plays anywhere.
+
+### 6.6 Colour independence (visual + tooling)
+- [ ] Greyscale / colour-filter pass of the county profile: dimension values, units, "Not available", and genuine "0" are all distinguishable without colour.
+- [ ] Selected/focused map feature is distinguishable by the focus outline, not fill colour alone.
+
+---
+
+## 7. Residual items handed to CE-E08
+
+- Execution and sign-off of the §6 manual checklist in a real browser + AT +
+  device (this environment cannot run them).
+- The end-to-end happy-path acceptance walk (U.S. → State → County →
+  Profile → Dimension → Evidence → Underlying Data → Methodology) and the
+  CE-D01 analytical-foundation unchanged re-verification are CE-E08's own
+  gate, not CE-E07's.
+- Any responsive fix that the §6.3 viewport pass surfaces (returns for
+  approval; not in CE-E07 unless a concrete defect is found).
+- Roadmap decision on the §7-vs-§14 analytical-map inconsistency (§3).
+
+---
+
+## 8. CE-E07 status
+
+- Route-change live region implemented (`Layout.tsx`, `base.css`), with
+  automated coverage.
+- Stale keyboard-handling comment in `accessibility.test.tsx` corrected.
+- Consolidated CE-E07 automated accessibility/regression tests added (14
+  cases): map↔selector parity (both levels), route-announcer behaviour,
+  CE-E06 drill-down keyboard semantics, colour-independent values,
+  landmark/heading structure.
+- Full frontend suite 180/180 green; `npm run lint` clean; `tsc && vite
+  build` clean; backend suite and CE-E01 geographic validator unaffected and
+  green.
+- §7 analytical-map functionality explicitly recorded as N/A for the §14
+  baseline (§3).
+- Real-browser / screen-reader / on-device validation defined as an
+  execution-ready checklist (§6) for CE-E08.
+- No new dependencies. No browser-automation tooling. No backend, API,
+  database, analytical, or geographic-asset change. No tablet redesign.
