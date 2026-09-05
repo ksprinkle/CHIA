@@ -24,6 +24,15 @@ export interface UsStateMapProps {
  * This component only navigates by state FIPS; it performs no analytical
  * calculation and carries no measure/visualization state (out of CE-E02
  * scope -- see CE-E05/CE-E06).
+ *
+ * Each state feature carries an SVG `<title>` with the state name, giving the
+ * concise on-hover identification required by the governing v0.2 UX
+ * specification section 4.4 ("State Hover ... At minimum: State name"). This
+ * is the same native-`<title>` approach already used by `StateCountyMap`; the
+ * `aria-label` remains the authoritative accessible name (it wins over
+ * `<title>` in the accessible-name computation), so keyboard and
+ * screen-reader behavior is unchanged. The optional "number of counties"
+ * datum (section 4.4) is intentionally not included in this minimal slice.
  */
 export function UsStateMap({ states }: UsStateMapProps) {
   const navigate = useNavigate()
@@ -65,7 +74,9 @@ export function UsStateMap({ states }: UsStateMapProps) {
                       selectState(stateFips)
                     }
                   }}
-                />
+                >
+                  <title>{state.state_name}</title>
+                </Geography>
               )
             })
           }
