@@ -1,6 +1,13 @@
 import { fireEvent, screen, within } from '@testing-library/react'
 
-import { makeMultiStateCounties, renderApp, stubCountiesFetch } from '../test/harness'
+import { MISSING_FILL } from '../lib/choropleth'
+import {
+  makeMultiStateCounties,
+  makeStateScores,
+  renderApp,
+  stubApi,
+  stubCountiesFetch,
+} from '../test/harness'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -9,6 +16,11 @@ afterEach(() => {
 
 async function findMap() {
   return screen.findByRole('group', { name: /county map/i })
+}
+
+async function findCountyButton(name: RegExp) {
+  const map = await findMap()
+  return within(map).findByRole('button', { name })
 }
 
 describe('StateCountyMap (CE-E03)', () => {
@@ -95,5 +107,92 @@ describe('StateCountyMap (CE-E03)', () => {
     ).toBeInTheDocument()
     expect(within(map).queryAllByRole('button')).toHaveLength(1)
     expect(within(map).queryByRole('button', { name: /baldwin/i })).toBeNull()
+  })
+})
+
+describe('StateCountyMap (CE-E10 analytical choropleth)', () => {
+  it('colours each county by its active-dimension score and keeps the navigation contract', async () => {
+    stubCountiesFetch(makeMultiStateCounties())
+    const { router } = renderApp(['/states/01'])
+
+    const autauga = await findCountyButton(/select autauga county/i)
+
+    // Navigation contract unchanged: accessible name is still "Select {name}",
+    // and activation still routes to /counties/:fips.
+    expect(autauga).toHaveAttribute('aria-label', 'Select Autauga County')
+    expect(autauga).not.toHaveAttribute('title')
+
+    // Analytical colouring: a real fill (from the ramp), not the neutral
+    // CSS default, and a <title> carrying the value.
+    expect(autauga.style.fill).toMatch(/^#[0-9a-f]{6}$/i)
+    const title = autauga.querySelector('title')
+    expect(title?.textContent).toMatch(/^Autauga County — \d+ percentile$/)
+
+    fireEvent.click(autauga)
+    expect(router.state.location.pathname).toBe('/counties/01001')
+  })
+
+  it('uses the distinct MISSING_FILL and a "no data" title for an unavailable score', async () => {
+    stubApi({
+      counties: makeMultiStateCounties(),
+      stateScores: () =>
+        makeStateScores('01', makeMultiStateCounties().counties, {
+          '01001': { primary_care: { available: false } },
+        }),
+    })
+    renderApp(['/states/01'])
+
+    const autauga = await findCountyButton(/select autauga county/i)
+    expect(autauga.style.fill.toLowerCase()).toBe(MISSING_FILL.toLowerCase())
+    expect(autauga.querySelector('title')?.textContent).toBe(
+      'Autauga County — no data',
+    )
+  })
+
+  it('renders neutral (no inline fill, name-only title) while scores are still loading', async () => {
+    // Directory resolves, but the dimension-scores request never settles.
+    stubCountiesFetch((...args: unknown[]) => {
+      const url = String(args[0])
+      if (url.includes('/geo/')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            type: 'Topology',
+            arcs: [
+              [
+                [0, 0],
+                [1, 0],
+                [1, 1],
+                [0, 1],
+                [0, 0],
+              ],
+            ],
+            objects: {
+              counties: {
+                type: 'GeometryCollection',
+                geometries: [
+                  { type: 'Polygon', id: '01001', properties: { NAME: 'Autauga' }, arcs: [[0]] },
+                ],
+              },
+            },
+          }),
+        } as Response)
+      }
+      if (url.includes('/dimension-scores')) return new Promise<Response>(() => {})
+      if (url.includes('/explorer')) {
+        return Promise.resolve({ ok: false, status: 404, json: async () => ({}) } as Response)
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => makeMultiStateCounties(),
+      } as Response)
+    })
+    renderApp(['/states/01'])
+
+    const autauga = await findCountyButton(/select autauga county/i)
+    expect(autauga.style.fill).toBe('')
+    expect(autauga.querySelector('title')?.textContent).toBe('Autauga County')
   })
 })

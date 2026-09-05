@@ -125,3 +125,35 @@ export interface ExplorerResponse {
   provenance: Provenance
   methodology: MethodologyBlock
 }
+
+/**
+ * CE-E09 / CE-E10 state dimension-scores contract.
+ *
+ * Mirrors `app/schemas/state_scores.py` (`StateDimensionScoresResponse`):
+ * every county in one state with its four persisted access-dimension scores
+ * for the v0.1 period, returned verbatim. Used only to colour the CE-E10
+ * state county choropleth -- no analytical value is computed client-side.
+ */
+export interface DimensionScoreEntry {
+  dimension_id: string
+  available: boolean
+  score: number | null
+  score_status: string | null
+}
+
+export interface CountyDimensionScores {
+  county_fips: string
+  completeness_status: string | null
+  primary_care: DimensionScoreEntry
+  dental: DimensionScoreEntry
+  mental_health: DimensionScoreEntry
+  mua_p: DimensionScoreEntry
+}
+
+/** Envelope for GET /api/v1/states/{state_fips}/dimension-scores. */
+export interface StateDimensionScoresResponse {
+  state_fips: string
+  period: string
+  count: number
+  counties: CountyDimensionScores[]
+}

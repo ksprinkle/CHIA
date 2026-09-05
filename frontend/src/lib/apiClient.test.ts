@@ -3,6 +3,7 @@ import {
   ApiError,
   NotFoundError,
   getCountyExplorer,
+  getStateDimensionScores,
   listCounties,
 } from './apiClient'
 import type { CountyListResponse } from './types'
@@ -91,10 +92,27 @@ describe('apiClient (read-only)', () => {
     expect(error).not.toBeInstanceOf(NotFoundError)
   })
 
+  it('getStateDimensionScores() targets the state dimension-scores path', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({}))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await getStateDimensionScores('01')
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      `${API_BASE_URL}/states/01/dimension-scores`,
+    )
+  })
+
   it('exports only fetch wrappers -- no county list or analytical helpers', async () => {
     const module = await import('./apiClient')
     expect(Object.keys(module).sort()).toEqual(
-      ['ApiError', 'NotFoundError', 'getCountyExplorer', 'listCounties'].sort(),
+      [
+        'ApiError',
+        'NotFoundError',
+        'getCountyExplorer',
+        'getStateDimensionScores',
+        'listCounties',
+      ].sort(),
     )
   })
 })

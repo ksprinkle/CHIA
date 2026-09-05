@@ -6,7 +6,11 @@
  * name enrichment -- the API is the single source of truth.
  */
 import { API_BASE_URL } from './config'
-import type { CountyListResponse, ExplorerResponse } from './types'
+import type {
+  CountyListResponse,
+  ExplorerResponse,
+  StateDimensionScoresResponse,
+} from './types'
 
 /** A non-successful API response, or an inability to reach the API. */
 export class ApiError extends Error {
@@ -67,6 +71,21 @@ export function getCountyExplorer(
 ): Promise<ExplorerResponse> {
   return getJson<ExplorerResponse>(
     `/counties/${encodeURIComponent(countyFips)}/explorer`,
+    signal,
+  )
+}
+
+/**
+ * GET /api/v1/states/{state_fips}/dimension-scores -- every county in one
+ * state with its four persisted access-dimension scores for the v0.1 period
+ * (CE-E09). Read-only; the frontend never recomputes a score.
+ */
+export function getStateDimensionScores(
+  stateFips: string,
+  signal?: AbortSignal,
+): Promise<StateDimensionScoresResponse> {
+  return getJson<StateDimensionScoresResponse>(
+    `/states/${encodeURIComponent(stateFips)}/dimension-scores`,
     signal,
   )
 }

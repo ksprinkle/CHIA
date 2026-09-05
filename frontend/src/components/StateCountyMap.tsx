@@ -1,7 +1,9 @@
 import { useNavigate } from 'react-router-dom'
 import { ComposableMap, Geographies, Geography } from 'react-simple-maps'
 
-import type { County } from '../lib/types'
+import type { DimensionMeta } from '../lib/dimensions'
+import { fillForScore, formatScoreValue } from '../lib/choropleth'
+import type { County, CountyDimensionScores } from '../lib/types'
 
 const MAP_WIDTH = 800
 const MAP_HEIGHT = 600
@@ -13,35 +15,51 @@ function countyGeographyUrl(stateFips: string): string {
 export interface StateCountyMapProps {
   stateFips: string
   counties: County[]
+  /**
+   * CE-E10 analytical colouring. When BOTH are supplied the map paints each
+   * county by its score on `activeDimension`; when omitted (scores loading or
+   * failed) the map renders neutral, exactly as CE-E03. Supplying these never
+   * changes the navigation contract: every county is still a keyboard- and
+   * pointer-activatable control that navigates to `/counties/:countyFips`, and
+   * its accessible name is unchanged (`Select {county name}`).
+   */
+  scores?: Map<string, CountyDimensionScores>
+  activeDimension?: DimensionMeta
 }
 
 /**
  * CE-E03 state-level county map (governing v0.2 UX specification, section
- * 14 "CE-E03 -- State County Map", detailed in section 5).
+ * 14 "CE-E03 -- State County Map", detailed in section 5), extended in
+ * CE-E10 with an optional analytical choropleth layer (section 7).
  *
  * Renders the CE-E01 committed per-state county boundaries
- * (`frontend/public/geo/counties/<state_fips>.topojson`, untouched by this
- * slice) for the counties belonging to one state, and lets the user select a
- * county, navigating to `/counties/:countyFips`. `counties` is the single
+ * (`frontend/public/geo/counties/<state_fips>.topojson`, untouched) for the
+ * counties belonging to one state, and lets the user select a county,
+ * navigating to `/counties/:countyFips`. `counties` is the single
  * authoritative per-state county dataset -- see `lib/counties.ts`'s
  * `deriveCountiesForState` -- consumed identically by `CountySelectForState`:
  * a geometry feature is only rendered as selectable when its GEOID (joined
- * by stable FIPS, never by name) matches an entry in `counties`, so the map
- * can never disagree with the accessible selector about which counties
- * exist.
+ * by stable FIPS, never by name) matches an entry in `counties`.
  *
  * The map is zoomed/centered to the selected state's counties using only
- * react-simple-maps' own `path` (a d3 GeoPath already supplied by its
- * `Geographies` render-prop's `bounds()`) -- no additional projection or
- * geometry library is introduced.
+ * react-simple-maps' own `path` -- no additional projection or geometry
+ * library is introduced.
  *
- * This is a neutral navigation map: every county receives identical visual
- * treatment. No measure/analytical value is displayed or implied (out of
- * CE-E03 scope -- see CE-E05/CE-E06).
+ * CE-E10: when `scores` + `activeDimension` are provided, each county's
+ * `fill` comes from `lib/choropleth.ts` (a hand-rolled ramp; no d3 import)
+ * and an SVG `<title>` carries the county name and its value on hover. The
+ * legend, dimension selector, and accessible data table live in `StatePage`.
+ * When they are absent the map is visually identical to CE-E03.
  */
-export function StateCountyMap({ stateFips, counties }: StateCountyMapProps) {
+export function StateCountyMap({
+  stateFips,
+  counties,
+  scores,
+  activeDimension,
+}: StateCountyMapProps) {
   const navigate = useNavigate()
   const countiesByFips = new Map(counties.map((county) => [county.county_fips, county]))
+  const choropleth = scores !== undefined && activeDimension !== undefined
 
   function selectCounty(countyFips: string) {
     if (countiesByFips.has(countyFips)) {
@@ -63,12 +81,6 @@ export function StateCountyMap({ stateFips, counties }: StateCountyMapProps) {
           {({ geographies, path }) => {
             const supported = geographies.filter((geo) => countiesByFips.has(String(geo.id)))
 
-            // Zoom/center the state's counties within the shared national
-            // AlbersUSA projection, using only `path` (a d3 GeoPath already
-            // supplied by react-simple-maps' own render-prop) -- no
-            // additional projection/geometry library is introduced. Typed
-            // inline so `geo`/`path` keep react-simple-maps' own inferred
-            // types rather than a hand-written (and mismatched) signature.
             let transform = ''
             if (supported.length > 0) {
               let minX = Infinity
@@ -105,11 +117,36 @@ export function StateCountyMap({ stateFips, counties }: StateCountyMapProps) {
                   const county = countiesByFips.get(countyFips)
                   if (!county) return null
 
+                  let fillStyle: { default: { fill: string } } | undefined
+                  let titleText = county.county_name
+
+                  if (choropleth) {
+                    const entry = scores.get(countyFips)
+                    const dimensionScore = entry
+                      ? entry[activeDimension.key]
+                      : undefined
+                    const score =
+                      dimensionScore && dimensionScore.available
+                        ? dimensionScore.score
+                        : null
+                    fillStyle = {
+                      default: { fill: fillForScore(score, activeDimension.kind) },
+                    }
+                    titleText =
+                      score === null
+                        ? `${county.county_name} — no data`
+                        : `${county.county_name} — ${formatScoreValue(
+                            score,
+                            activeDimension.kind,
+                          )}`
+                  }
+
                   return (
                     <Geography
                       key={geo.rsmKey}
                       geography={geo}
                       className="state-county-map__county"
+                      style={fillStyle}
                       tabIndex={0}
                       role="button"
                       aria-label={`Select ${county.county_name}`}
@@ -120,7 +157,9 @@ export function StateCountyMap({ stateFips, counties }: StateCountyMapProps) {
                           selectCounty(countyFips)
                         }
                       }}
-                    />
+                    >
+                      <title>{titleText}</title>
+                    </Geography>
                   )
                 })}
               </g>

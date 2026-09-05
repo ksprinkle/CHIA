@@ -5,9 +5,12 @@ import { CountyDirectoryProvider } from '../lib/countyDirectory'
 import { routes } from '../router'
 import type {
   AccessProfile,
+  CountyDimensionScores,
   CountyListResponse,
   DimensionProfile,
+  DimensionScoreEntry,
   ExplorerResponse,
+  StateDimensionScoresResponse,
 } from '../lib/types'
 
 type FetchImpl = (...args: unknown[]) => Promise<Response> | Response
@@ -158,6 +161,29 @@ function geographyResponseFor(url: string): Promise<Response> {
   return okJson(STUB_US_STATES_TOPOJSON)
 }
 
+/** CE-E09/E10: `/api/v1/states/{state_fips}/dimension-scores` -> the two-digit
+ *  state FIPS, or null for any other URL. */
+function stateScoresFipsFromUrl(url: string): string | null {
+  return url.match(/\/states\/(\d{2})\/dimension-scores/)?.[1] ?? null
+}
+
+/**
+ * Default CE-E09 response for a state, synthesized from an already-stubbed
+ * county list so the ~30 existing `/states/:fips` tests that do not care about
+ * the CE-E10 choropleth still get a valid payload (and the state page renders
+ * its "ready" choropleth branch). An unknown state FIPS -> 404, mirroring the
+ * real endpoint.
+ */
+function defaultStateScoresResponse(
+  url: string,
+  counties: CountyListResponse['counties'],
+): Promise<Response> {
+  const stateFips = stateScoresFipsFromUrl(url) as string
+  const inState = counties.filter((county) => county.state_fips === stateFips)
+  if (inState.length === 0) return errStatus(404)
+  return okJson(makeStateScores(stateFips, counties))
+}
+
 /**
  * Stub the global `fetch` for `GET /api/v1/counties` (Vitest, no MSW).
  *
@@ -180,6 +206,9 @@ export function stubCountiesFetch(payload: CountyListResponse | Error | FetchImp
     impl = (...args: unknown[]) => {
       const url = String(args[0])
       if (isGeographyRequest(url)) return geographyResponseFor(url)
+      if (stateScoresFipsFromUrl(url) !== null) {
+        return defaultStateScoresResponse(url, payload.counties)
+      }
       if (url.includes('/explorer')) return errStatus(404)
       return okJson(payload)
     }
@@ -193,13 +222,37 @@ interface ApiStub {
   counties?: CountyListResponse | Error
   /** Return an ExplorerResponse, an Error to throw, or an HTTP status number. */
   explorer?: (fips: string) => ExplorerResponse | Error | number
+  /**
+   * CE-E09 `/states/{state_fips}/dimension-scores`. Return a response, an
+   * Error to throw, or an HTTP status number. Omit for the default synthesized
+   * from `counties`.
+   */
+  stateScores?: (
+    stateFips: string,
+  ) => StateDimensionScoresResponse | Error | number
 }
 
-/** Stub the global `fetch` for both CHIA API endpoints, routed by URL. */
+/** Stub the global `fetch` for the CHIA API endpoints, routed by URL. */
 export function stubApi(stub: ApiStub = {}) {
   const impl: FetchImpl = (...args: unknown[]) => {
     const url = String(args[0])
     if (isGeographyRequest(url)) return geographyResponseFor(url)
+
+    const stateScoresFips = stateScoresFipsFromUrl(url)
+    if (stateScoresFips !== null) {
+      if (stub.stateScores) {
+        const result = stub.stateScores(stateScoresFips)
+        if (typeof result === 'number') return errStatus(result)
+        if (result instanceof Error) throw result
+        return okJson(result)
+      }
+      const list =
+        stub.counties && !(stub.counties instanceof Error)
+          ? stub.counties.counties
+          : []
+      return defaultStateScoresResponse(url, list)
+    }
+
     const explorerFips = url.match(/\/counties\/(\d{5})\/explorer/)?.[1]
     if (explorerFips !== undefined) {
       const result = stub.explorer ? stub.explorer(explorerFips) : 404
@@ -229,6 +282,70 @@ export function makeCounties(fipsList: string[]): CountyListResponse {
       county_name: '0',
       state_name: '',
     })),
+  }
+}
+
+const STATE_SCORE_DIMENSION_IDS: Record<keyof AccessProfile, string> = {
+  primary_care: 'PRIMARY_CARE',
+  dental: 'DENTAL',
+  mental_health: 'MENTAL_HEALTH',
+  mua_p: 'MUA_P',
+}
+
+/** Deterministic 0..100 synthetic score from a county's FIPS + dimension. */
+function syntheticStateScore(countyFips: string, index: number): number {
+  return (Number(countyFips.slice(-4)) * 7 + index * 23) % 101
+}
+
+/**
+ * CE-E09/E10: a `StateDimensionScoresResponse` for `stateFips`, synthesized
+ * from `counties` (the same county list the map/selector derive from). Every
+ * dimension defaults to `available: true`; pass `overrides[countyFips][key]`
+ * to mark one dimension unavailable or pin a score.
+ */
+export function makeStateScores(
+  stateFips: string,
+  counties: CountyListResponse['counties'],
+  overrides: Record<
+    string,
+    Partial<Record<keyof AccessProfile, Partial<DimensionScoreEntry>>>
+  > = {},
+): StateDimensionScoresResponse {
+  const inState = counties
+    .filter((county) => county.state_fips === stateFips)
+    .sort((a, b) => a.county_fips.localeCompare(b.county_fips))
+
+  const rows: CountyDimensionScores[] = inState.map((county) => {
+    const entryFor = (key: keyof AccessProfile, index: number): DimensionScoreEntry => {
+      const base: DimensionScoreEntry = {
+        dimension_id: STATE_SCORE_DIMENSION_IDS[key],
+        available: true,
+        score: syntheticStateScore(county.county_fips, index),
+        score_status: 'calculated',
+      }
+      const patch = overrides[county.county_fips]?.[key]
+      if (!patch) return base
+      const merged = { ...base, ...patch }
+      if (merged.available === false) {
+        return { ...merged, score: null, score_status: null }
+      }
+      return merged
+    }
+    return {
+      county_fips: county.county_fips,
+      completeness_status: 'complete',
+      primary_care: entryFor('primary_care', 0),
+      dental: entryFor('dental', 1),
+      mental_health: entryFor('mental_health', 2),
+      mua_p: entryFor('mua_p', 3),
+    }
+  })
+
+  return {
+    state_fips: stateFips,
+    period: 'v0.1',
+    count: rows.length,
+    counties: rows,
   }
 }
 

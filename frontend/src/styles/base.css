@@ -698,6 +698,120 @@ code {
   color: inherit;
 }
 
+/* CE-E10 state county analytical heat map: measure selector (mirrors the
+   other selectors), legend, status line, and the accessible data table. */
+.dimension-selector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 24rem;
+  margin: var(--space-3) 0 var(--space-2);
+}
+
+.dimension-selector__label {
+  font-weight: 600;
+}
+
+.dimension-selector__control {
+  font: inherit;
+  padding: var(--space-2);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: inherit;
+}
+
+.state-page__scores-status {
+  color: var(--color-muted);
+  margin: var(--space-2) 0;
+}
+
+.choropleth-legend {
+  margin: var(--space-2) 0 var(--space-3);
+  max-width: 32rem;
+  font-size: 0.9375rem;
+}
+
+.choropleth-legend__measure {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  align-items: baseline;
+  margin: 0 0 var(--space-1);
+}
+
+.choropleth-legend__scale {
+  color: var(--color-muted);
+}
+
+.choropleth-legend__ramp {
+  height: 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+}
+
+.choropleth-legend__ends {
+  display: flex;
+  justify-content: space-between;
+  margin: var(--space-1) 0 var(--space-2);
+  color: var(--color-muted);
+}
+
+.choropleth-legend__missing {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+}
+
+.choropleth-legend__swatch {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  flex: none;
+}
+
+.choropleth-legend__caption {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.county-score-table {
+  margin: var(--space-3) 0;
+}
+
+.county-score-table__summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.county-score-table table {
+  border-collapse: collapse;
+  margin-top: var(--space-2);
+  width: 100%;
+  max-width: 32rem;
+  font-size: 0.9375rem;
+}
+
+.county-score-table caption {
+  text-align: left;
+  color: var(--color-muted);
+  margin-bottom: var(--space-1);
+}
+
+.county-score-table th,
+.county-score-table td {
+  border: 1px solid var(--color-border);
+  padding: var(--space-1) var(--space-2);
+  text-align: left;
+}
+
+.county-score-table thead th {
+  background: var(--color-surface);
+}
+
 @media (max-width: 600px) {
   .app-main {
     padding: var(--space-4) var(--space-2);
@@ -716,6 +830,10 @@ code {
   }
 
   .county-select-for-state {
+    max-width: none;
+  }
+
+  .dimension-selector {
     max-width: none;
   }
 }
