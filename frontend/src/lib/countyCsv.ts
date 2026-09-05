@@ -50,6 +50,8 @@ export const CSV_COLUMNS = [
   'source_reference_period',
   'source_url',
   'source_accessed_at',
+  'source_artifact_filename',
+  'source_content_sha256',
 ] as const
 
 type CsvColumn = (typeof CSV_COLUMNS)[number]
@@ -138,6 +140,8 @@ export function buildCountyCsv(data: ExplorerResponse): CountyCsv {
       source_reference_period: cell(source?.reference_period),
       source_url: cell(source?.url),
       source_accessed_at: cell(source?.accessed_at),
+      source_artifact_filename: cell(source?.artifact_filename),
+      source_content_sha256: cell(source?.content_sha256),
     })
     rows.push(primary)
 

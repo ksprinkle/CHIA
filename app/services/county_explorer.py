@@ -368,7 +368,7 @@ def _load_provenance(
     rows = connection.execute(
         f"""
         SELECT source_id, source_name, publisher, dataset_name, reference_period,
-               url, accessed_at
+               url, accessed_at, artifact_filename, content_sha256
         FROM source
         WHERE source_id IN ({placeholders})
         ORDER BY source_id
@@ -391,6 +391,8 @@ def _load_provenance(
                 reference_period=row[4],
                 url=row[5],
                 accessed_at=row[6],
+                artifact_filename=row[7],
+                content_sha256=row[8],
             )
             for row in rows
         ]

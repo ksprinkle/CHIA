@@ -98,9 +98,14 @@ export interface SourceRef {
   source_name: string
   publisher: string | null
   dataset_name: string | null
+  /** Source-data vintage (CE-E12B: the HRSA Data Warehouse snapshot date). */
   reference_period: string | null
   url: string | null
   accessed_at: string | null
+  /** CE-E12B: exact Data/Processed build-input workbook for this source. */
+  artifact_filename: string | null
+  /** CE-E12B: SHA-256 of that build-input workbook's bytes. */
+  content_sha256: string | null
 }
 
 export interface Provenance {

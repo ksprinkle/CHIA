@@ -169,9 +169,29 @@ class SourceRef(BaseModel):
     source_name: str
     publisher: str | None = None
     dataset_name: str | None = None
-    reference_period: str | None = None
-    url: str | None = None
-    accessed_at: str | None = None
+    reference_period: str | None = Field(
+        None,
+        description=(
+            "Persisted source.reference_period -- the source-data vintage "
+            "(CE-E12B: the HRSA Data Warehouse snapshot date)."
+        ),
+    )
+    url: str | None = Field(None, description="Persisted source.url (canonical retrieval location).")
+    accessed_at: str | None = Field(None, description="Persisted source.accessed_at (ISO date).")
+    artifact_filename: str | None = Field(
+        None,
+        description=(
+            "CE-E12B: exact Data/Processed build-input workbook this source was "
+            "loaded from. Presentation/provenance only."
+        ),
+    )
+    content_sha256: str | None = Field(
+        None,
+        description=(
+            "CE-E12B: SHA-256 of that build-input workbook's bytes. Lets a "
+            "consumer confirm it holds the same source vintage."
+        ),
+    )
 
 
 class Provenance(BaseModel):

@@ -462,7 +462,7 @@ describe('CountyPage (CE-C04 evidence / methodology / composite)', () => {
     ).toBeInTheDocument()
   })
 
-  it('renders all four provenance sources with no links and no accessed dates', async () => {
+  it('renders all four provenance sources with the CE-E12B source vintage and artifact metadata', async () => {
     stubValidCounty()
     renderApp(['/counties/01001'])
     const sources = await screen.findByRole('region', { name: /sources/i })
@@ -472,12 +472,30 @@ describe('CountyPage (CE-C04 evidence / methodology / composite)', () => {
     }
     expect(within(sources).getAllByText('HRSA')).toHaveLength(4)
     expect(within(sources).getByText('Dental HPSA Spatial Coverage')).toBeInTheDocument()
-    expect(within(sources).getAllByText('v0.1 source period')).toHaveLength(4)
     // dimension-to-source association via source_id
     expect(within(sources).getByText('Primary Care Access')).toBeInTheDocument()
-    // no external links, no accessed dates
-    expect(within(sources).queryByRole('link')).toBeNull()
-    expect(within(sources).queryByText(/accessed/i)).toBeNull()
+
+    // CE-E12B: source-data vintage, retrieval location + date, and the exact
+    // build-input artifact (filename + SHA-256) for every source.
+    expect(
+      within(sources).getAllByText('HRSA Data Warehouse snapshot 2026-08-29'),
+    ).toHaveLength(4)
+    expect(within(sources).getAllByText('2026-08-29')).toHaveLength(4)
+    const links = within(sources).getAllByRole('link')
+    expect(links).toHaveLength(4)
+    for (const link of links) {
+      expect(link).toHaveAttribute('href', 'https://data.hrsa.gov/data/download')
+    }
+    expect(
+      within(sources).getByText(
+        'CHIA_Primary_Care_HPSA_Spatial_Coverage_Validated_FINAL.xlsx',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      within(sources).getByText(
+        '709e9ed6070f71e466b65b0928d1dbe23d3dd685ecfb81d4cb1cc0ee637c2d93',
+      ),
+    ).toBeInTheDocument()
   })
 
   it('renders the experimental composite value, label and status', async () => {

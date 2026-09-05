@@ -46,7 +46,7 @@ describe('slugify', () => {
 })
 
 describe('buildCountyCsv (CE-E11)', () => {
-  it('starts with a UTF-8 BOM, two quoted metadata lines, then the exact 29-column header', () => {
+  it('starts with a UTF-8 BOM, two quoted metadata lines, then the exact 31-column header', () => {
     const { csv } = buildCountyCsv(
       makeExplorer('01001', { county: { county_name: 'Autauga County' } }),
     )
@@ -58,7 +58,11 @@ describe('buildCountyCsv (CE-E11)', () => {
     )
     expect(lines[1]).toMatch(/^"Values verbatim from the CHIA v0\.1 analytical pipeline;/)
     expect(lines[2]).toBe(CSV_COLUMNS.map((c) => `"${c}"`).join(','))
-    expect(CSV_COLUMNS).toHaveLength(29)
+    expect(CSV_COLUMNS).toHaveLength(31)
+    expect(CSV_COLUMNS.slice(-2)).toEqual([
+      'source_artifact_filename',
+      'source_content_sha256',
+    ])
   })
 
   it('terminates every record with CRLF, including the last, and uses no bare LF', () => {
@@ -159,6 +163,10 @@ describe('buildCountyCsv (CE-E11)', () => {
       'source_publisher',
       'source_dataset',
       'source_reference_period',
+      'source_url',
+      'source_accessed_at',
+      'source_artifact_filename',
+      'source_content_sha256',
     ] as const) {
       expect(supporting[COL[column]]).toBe('')
     }
@@ -175,15 +183,24 @@ describe('buildCountyCsv (CE-E11)', () => {
     expect(composite[COL.variable_id]).toBe('')
   })
 
-  it('carries full source provenance on primary rows', () => {
+  it('carries full source provenance and CE-E12B vintage metadata on primary rows', () => {
     const { csv } = buildCountyCsv(makeExplorer('01001'))
     const row = findRow(csv, 'PRIMARY_CARE', 'primary')
     expect(row[COL.source_id]).toBe('1')
     expect(row[COL.source_name]).toBe('Primary Care HPSA')
     expect(row[COL.source_publisher]).toBe('HRSA')
     expect(row[COL.source_dataset]).toBe('Primary Care HPSA Spatial Coverage')
-    expect(row[COL.source_reference_period]).toBe('v0.1 source period')
-    expect(row[COL.source_url]).toBe('')
+    expect(row[COL.source_reference_period]).toBe(
+      'HRSA Data Warehouse snapshot 2026-08-29',
+    )
+    expect(row[COL.source_url]).toBe('https://data.hrsa.gov/data/download')
+    expect(row[COL.source_accessed_at]).toBe('2026-08-29')
+    expect(row[COL.source_artifact_filename]).toBe(
+      'CHIA_Primary_Care_HPSA_Spatial_Coverage_Validated_FINAL.xlsx',
+    )
+    expect(row[COL.source_content_sha256]).toBe(
+      '709e9ed6070f71e466b65b0928d1dbe23d3dd685ecfb81d4cb1cc0ee637c2d93',
+    )
     expect(row[COL.methodology_version]).toBe('v0.1')
     expect(row[COL.county_fips]).toBe('01001')
   })

@@ -5,8 +5,10 @@ import type { AccessProfile, SourceRef } from '../lib/types'
  * CE-C04 provenance / sources (governing specification section 15).
  *
  * Renders the API-provided sources verbatim: `source_name`, `publisher`,
- * `dataset_name`, `reference_period`. All v0.1 `url` / `accessed_at` values are
- * null, so no external links and no accessed dates are rendered. The
+ * `dataset_name`, `reference_period`, and (CE-E12B) `url`, `accessed_at`,
+ * `artifact_filename`, `content_sha256` -- the source-data vintage and the
+ * exact build-input artifact (filename + SHA-256) so a profile is traceable
+ * to a known source vintage. Every field is rendered only when present. The
  * dimension-to-source association comes from `dimension.source_id`.
  *
  * CE-E04: the full content is unchanged but now sits behind a native
@@ -61,6 +63,47 @@ export function ProvenancePanel({
                       <div>
                         <dt>Reference period</dt>
                         <dd>{source.reference_period}</dd>
+                      </div>
+                    ) : null}
+                    {source.url ? (
+                      <div>
+                        <dt>Source download</dt>
+                        <dd>
+                          <a
+                            href={source.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="provenance__link"
+                          >
+                            {source.url}
+                          </a>
+                        </dd>
+                      </div>
+                    ) : null}
+                    {source.accessed_at ? (
+                      <div>
+                        <dt>Accessed</dt>
+                        <dd>{source.accessed_at}</dd>
+                      </div>
+                    ) : null}
+                    {source.artifact_filename ? (
+                      <div>
+                        <dt>Source file</dt>
+                        <dd>
+                          <code className="provenance__artifact">
+                            {source.artifact_filename}
+                          </code>
+                        </dd>
+                      </div>
+                    ) : null}
+                    {source.content_sha256 ? (
+                      <div>
+                        <dt>SHA-256</dt>
+                        <dd>
+                          <code className="provenance__artifact">
+                            {source.content_sha256}
+                          </code>
+                        </dd>
                       </div>
                     ) : null}
                     {usedBy.length > 0 ? (

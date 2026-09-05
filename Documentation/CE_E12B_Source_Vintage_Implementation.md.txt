@@ -1,0 +1,207 @@
+# CHIA County Explorer v0.2 — CE-E12B
+
+# Source Vintage Metadata Implementation — Record
+
+**Slice:** CE-E12B (implementation of the CE-E12A design)
+**Date:** September 5, 2026
+**Baseline:** `ce-e12a` / `6d04c43`
+**Status:** implemented; full gate green; **not committed / not pushed** — awaiting review
+
+---
+
+# 1. What changed
+
+Established authoritative source-vintage and reproducibility metadata on the
+canonical database **without changing any analytical value**, per
+`Documentation/CE_E12A_Data_Vintage_Design.md.txt` and the catalogue in
+`Documentation/ANALYTICAL_DATA_SOURCES.md.txt`.
+
+## Schema
+
+`Data/Model/schema.sql` — `source` gained two additive, nullable `TEXT` columns:
+
+| Column | Meaning |
+| --- | --- |
+| `artifact_filename` | exact `Data/Processed` build-input workbook the source was loaded from |
+| `content_sha256` | SHA-256 of that workbook's bytes |
+
+No index, FK, `NOT NULL`, default, or change to any existing column.
+
+## Data (all four `source` rows)
+
+| Field | Value |
+| --- | --- |
+| `reference_period` | `HRSA Data Warehouse snapshot 2026-08-29` (was `v0.1 source period`) |
+| `url` | `https://data.hrsa.gov/data/download` (was `NULL`) |
+| `accessed_at` | `2026-08-29` (was `NULL`) |
+| `artifact_filename` | per source — see catalogue |
+| `content_sha256` | per source — SHA-256 of the build-input workbook |
+
+`county_period.period` and `methodology.methodology_version` unchanged (`v0.1`).
+
+## Migration
+
+`Data/Model/migrate_v12_source_vintage.py` (new) — scoped, transactional,
+`source`-only. Not a full `build_v01_database.py` rebuild (a rebuild would hit
+the documented MUA/P `dimension_score` regeneration gap).
+
+1. Idempotency guard: if `source` already carries both columns fully populated,
+   no-op.
+2. Refuses to run unless the database is exactly the `ce-e12a` file
+   (sha-256 `0d8bb417…a2966`).
+3. Requires each `Data/Processed` build-input workbook present and its bytes to
+   match the SHA-256 documented in `ANALYTICAL_DATA_SOURCES.md.txt`.
+4. Captures an exact fingerprint (row count + ordered-content SHA-256) of
+   `observation`, `normalized_measure`, `dimension_score`, `composite_score`.
+5. In one transaction: `ALTER TABLE source ADD COLUMN` ×2; `UPDATE` each of the
+   four rows (asserting `rowcount == 1`); re-compute the analytical fingerprint
+   and **abort unless byte-identical**; `PRAGMA foreign_key_check` clean;
+   `COUNT(*) FROM source == 4`; all five vintage fields non-NULL. Commit,
+   else roll back.
+6. Post-commit read-only re-check of the analytical fingerprint.
+
+Run once against `Data/Model/chia_v01.sqlite` with SQLite library **3.45.1**.
+
+## Build / seed path
+
+* `Data/Model/seed_v01.sql` — the four `source` inserts now carry the full real
+  metadata (including literal `content_sha256`), so a fresh `build_v01_database.py`
+  produces a database already holding it.
+* `Data/Model/build_v01_database.py` — imports `hashlib`, defines
+  `SOURCE_REFERENCE_PERIOD` / `SOURCE_URL` / `SOURCE_ACCESSED_AT` and
+  `file_sha256()`, and after the source loop `UPDATE`s each row to converge on
+  the vintage metadata with `content_sha256` **recomputed from the file the
+  build actually read**.
+
+## API / presentation
+
+* `app/schemas/explorer.py` — `SourceRef` gains `artifact_filename` /
+  `content_sha256` (`str | None`, described).
+* `app/services/county_explorer.py` — `_load_provenance` selects and maps the
+  two new columns. No other query changed.
+* `frontend/src/lib/types.ts` — `SourceRef` mirrors the two new fields.
+* `frontend/src/components/ProvenancePanel.tsx` — the page-level **Sources**
+  disclosure now renders, per source and only when present: `Source download`
+  (an external link to `url`), `Accessed` (`accessed_at`), `Source file`
+  (`artifact_filename`), `SHA-256` (`content_sha256`). Doc comment updated. The
+  per-dimension `DimensionProvenance` (deliberately minimal) is unchanged apart
+  from already displaying the new `reference_period` value.
+* `frontend/src/lib/countyCsv.ts` — `CSV_COLUMNS` gains
+  `source_artifact_filename` and `source_content_sha256` (29 → 31), populated on
+  `primary` rows; blank on `supporting` / `composite` rows (CE-E11 behaviour
+  preserved — supporting evidence still has no per-variable source in v0.1).
+* `frontend/src/styles/base.css` — `.provenance__artifact` (shares the existing
+  code-token treatment) and `.provenance__link` (`word-break`).
+
+## Coordinated database-hash re-baseline
+
+New canonical identity (SQLite 3.45.1):
+
+| Digest | Was (`ce-e12a`) | Now (`CE-E12B`) |
+| --- | --- | --- |
+| sha-256 | `0d8bb417ccf72acf0cef7d17bcca15627900d0df419fc259de553a95b9aa2966` | `12b3525e77cdc85ba7fedbb463fcc75f21c489825c0e81d98cdf71a2b7c7174c` |
+| md5 | `f53b3de17b627b3b02796df9de33b5a4` | `1ff3f2731c96d7dcab4491b8ac53765d` |
+
+`EXPECTED_PRODUCTION_SHA256` updated in all six anchors: `test_ce_a06`,
+`test_ce_b01`, `test_ce_b02`, `test_ce_d01_concurrent_connection`,
+`test_ce_d01_county_reference_correction`, `test_ce_e09`. The new md5/sha-256 are
+recorded in `ANALYTICAL_DATA_SOURCES.md.txt` and this document.
+`test_ce_b02` also gained the two `source` columns in its fixture schema + insert.
+
+---
+
+# 2. Reproducibility guarantees — `tests/test_ce_e12_source_vintage.py` (new, 14 tests)
+
+| Test | Asserts |
+| --- | --- |
+| `test_database_is_the_new_canonical_hash` | migrated file sha-256 == `12b3525e…7174c`, md5 == `1ff3f273…765d` |
+| `test_new_hash_is_re_based_into_every_backend_anchor` | all six anchor files carry the new hash and none the old |
+| `test_exactly_four_source_rows` | four sources, expected names |
+| `test_every_source_has_complete_vintage_and_provenance_metadata` | `reference_period` / `url` / `accessed_at` / `artifact_filename` / `content_sha256` non-null, non-blank on every row |
+| `test_reference_period_url_accessed_at_are_the_authoritative_values` | exact match to the migration constants |
+| `test_source_name_to_artifact_mapping_matches_migration_config` | DB (`source_name` → filename, sha-256) == migration `SOURCES` |
+| `test_content_sha256_matches_on_disk_artifact` | recorded hash == `sha256(Data/Processed/<filename>)` (skips if the gitignored file is absent) |
+| `test_metadata_matches_authoritative_documentation` | every filename, sha-256, and the `reference_period` string appear verbatim in `ANALYTICAL_DATA_SOURCES.md.txt` |
+| `test_analytical_values_unchanged_since_ce_e12a` | `observation` / `normalized_measure` / `dimension_score` / `composite_score` count + ordered-content SHA-256 == `PRE_MIGRATION_ANALYTICAL` |
+| `test_period_and_methodology_still_v01` | `county_period.period` and `methodology.methodology_version` == `v0.1` |
+| `test_all_v01_analytical_validators_pass` | the five `validate_v01_*` scripts each exit 0 |
+| `test_api_exposes_new_source_vintage_metadata` | `GET /counties/01001/explorer` provenance carries the new fields for all four sources |
+| `test_read_only_digest_unchanged_after_api_reads` | explorer reads do not mutate the file; digest == new canonical |
+| `test_migration_is_idempotent` | re-running `migrate()` is a no-op; hash stable |
+
+Pre-migration analytical fingerprint (captured from `ce-e12a`, reproduced
+exactly post-migration):
+
+```
+observation        count 59717  sha256 ebdc90c1207e11593712837160ca93dfb350a477a083331561f51d9fdc31b86c
+normalized_measure count  9429  sha256 11d8cb362ff63ee9833eaa8505be2704bdd304650052a3de4e58be66032da952
+dimension_score    count 12572  sha256 798094bb6b6a1d81d87fe1f3d2eb0694f6bab44b7c2ea1cf70994ea3d24eed70
+composite_score    count  3143  sha256 56b50546c687bd6545cd514468b2d1d740e8e1b63b2616ae199cb6da36e7f9b8
+```
+
+---
+
+# 3. Validation gate (all green)
+
+| Check | Result |
+| --- | --- |
+| Backend `python -m unittest discover -s tests` | **153 / 153** (139 prior + 14 CE-E12) |
+| `validate_v01_database` / `_normalization` / `_dimension_scores` / `_composite` / `_county_explorer` | PASSED |
+| `validate_v02_geographic_join` | PASSED |
+| Frontend `vitest run` | **232 / 232** (22 files) |
+| Frontend `eslint --ext .ts,.tsx --max-warnings 0` | clean |
+| Frontend `tsc && vite build` | clean |
+| `chia_v01.sqlite` sha-256 | `12b3525e77cdc85ba7fedbb463fcc75f21c489825c0e81d98cdf71a2b7c7174c` |
+| `chia_v01.sqlite` md5 | `1ff3f2731c96d7dcab4491b8ac53765d` |
+| Analytical tables vs. `ce-e12a` | byte-identical (fingerprints match) |
+
+---
+
+# 4. Constraints honoured
+
+* `county_period.period` unchanged (`v0.1`). Methodology semantics unchanged.
+* No analytical formula, normalization, dimension score, or composite score
+  touched — proven by the transactional fingerprint check and
+  `test_analytical_values_unchanged_since_ce_e12a`.
+* Scoped `source`-only migration; the database was **not** rebuilt.
+* No automated scheduler / download process.
+* No change to the State/County selector (CE-E13).
+* Not pushed.
+
+---
+
+# 5. Files changed
+
+**Schema / data / build**
+- `Data/Model/schema.sql`
+- `Data/Model/seed_v01.sql`
+- `Data/Model/build_v01_database.py`
+- `Data/Model/migrate_v12_source_vintage.py` (new)
+- `Data/Model/chia_v01.sqlite` (gitignored; migrated in place)
+
+**Backend**
+- `app/schemas/explorer.py`
+- `app/services/county_explorer.py`
+
+**Backend tests**
+- `tests/test_ce_e12_source_vintage.py` (new)
+- `tests/test_ce_a06_county_explorer_validation.py` (anchor)
+- `tests/test_ce_b01_county_api.py` (anchor)
+- `tests/test_ce_b02_county_explorer.py` (anchor + fixture `source` schema/insert)
+- `tests/test_ce_d01_concurrent_connection.py` (anchor)
+- `tests/test_ce_d01_county_reference_correction.py` (anchor)
+- `tests/test_ce_e09_state_dimension_scores.py` (anchor)
+
+**Frontend**
+- `frontend/src/lib/types.ts`
+- `frontend/src/components/ProvenancePanel.tsx`
+- `frontend/src/lib/countyCsv.ts`
+- `frontend/src/styles/base.css`
+- `frontend/src/test/harness.tsx`
+- `frontend/src/lib/countyCsv.test.ts`
+- `frontend/src/pages/CountyPage.test.tsx`
+
+**Documentation**
+- `Documentation/ANALYTICAL_DATA_SOURCES.md.txt` (applied state, new hashes)
+- `Documentation/CE_E12B_Source_Vintage_Implementation.md.txt` (new — this file)
+- `Documentation/PROJECT_LOG.md.txt` (CE-E12B entry)

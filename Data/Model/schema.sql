@@ -45,7 +45,15 @@ CREATE TABLE IF NOT EXISTS source (
     dataset_name TEXT,
     reference_period TEXT,
     url TEXT,
-    accessed_at TEXT
+    accessed_at TEXT,
+    -- CE-E12B source-vintage / reproducibility metadata. Nullable, additive,
+    -- presentation-only: no analytical script reads the source table.
+    -- artifact_filename: the exact Data/Processed build-input workbook this
+    -- source was loaded from; content_sha256: SHA-256 of that file's bytes.
+    -- Authoritative values catalogued in
+    -- Documentation/ANALYTICAL_DATA_SOURCES.md.txt.
+    artifact_filename TEXT,
+    content_sha256 TEXT
 );
 
 -- ============================================================

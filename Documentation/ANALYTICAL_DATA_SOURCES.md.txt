@@ -15,11 +15,13 @@ It is the analytical-layer counterpart to
 presentation/navigation geographic boundary layer (CE-E01). The two layers do
 not share data and are versioned independently.
 
-This document is produced by **CE-E12A** (data-vintage design; documentation
-only). CE-E12A records these facts; it does **not** modify the database, the
-build scripts, the seed SQL, or any application code. Populating the persisted
-`source` table with the values below is the separately authorized follow-on
-slice **CE-E12B**.
+This catalogue was established by **CE-E12A** (data-vintage design; documentation
+only) and is the authoritative record of the source vintages and artifact
+hashes. **CE-E12B** applied it: it added `source.artifact_filename` /
+`source.content_sha256`, populated all four `source` rows with the values below
+via a scoped transactional migration, aligned the build/seed path, exposed the
+new fields through the API and County Profile, and re-based the coordinated
+database-hash anchors. See `Documentation/CE_E12B_Source_Vintage_Implementation.md.txt`.
 
 ---
 
@@ -249,57 +251,74 @@ against `Data/Raw/`.
 
 # Current Database Identity
 
-`Data/Model/chia_v01.sqlite` as of CE-E12A (unchanged since `ce-e11` / `691f2b7`):
+`Data/Model/chia_v01.sqlite` **after the CE-E12B source-vintage migration**
+(SQLite library 3.45.1):
 
 | Digest | Value |
 | --- | --- |
-| md5 | `f53b3de17b627b3b02796df9de33b5a4` |
-| sha-256 | `0d8bb417ccf72acf0cef7d17bcca15627900d0df419fc259de553a95b9aa2966` |
+| md5 | `1ff3f2731c96d7dcab4491b8ac53765d` |
+| sha-256 | `12b3525e77cdc85ba7fedbb463fcc75f21c489825c0e81d98cdf71a2b7c7174c` |
+
+Pre-CE-E12B (the `ce-e12a` state) this was md5 `f53b3de17b627b3b02796df9de33b5a4`
+/ sha-256 `0d8bb417ccf72acf0cef7d17bcca15627900d0df419fc259de553a95b9aa2966`.
 
 The sha-256 is pinned as `EXPECTED_PRODUCTION_SHA256` by six backend test files
 (`test_ce_a06`, `test_ce_b01`, `test_ce_b02`, `test_ce_d01_concurrent_connection`,
 `test_ce_d01_county_reference_correction`, `test_ce_e09`); the md5 is the value
-the CE validation gate checks. Any change to the database file — data or schema —
-must update all seven anchors in one coordinated commit. That is the scope of
-CE-E12B, not CE-E12A.
+the CE validation gate checks. CE-E12B re-based all of these to the new hash in
+one coordinated change. `tests/test_ce_e12_source_vintage.py` additionally
+asserts the migrated file's md5/sha-256 and that every anchor carries the new
+value and none the old.
 
 ---
 
-# Persisted `source` Table — Today vs. Target
+# Persisted `source` Table — Applied (CE-E12B)
 
-Current rows in `Data/Model/chia_v01.sqlite` (`source` columns:
-`source_id, source_name, publisher, dataset_name, reference_period, url, accessed_at`):
+`Data/Model/schema.sql` gained two nullable `TEXT` columns on `source` —
+`artifact_filename` and `content_sha256`. The migration
+`Data/Model/migrate_v12_source_vintage.py` added them to the existing database
+and populated all four rows. `source` columns are now:
+`source_id, source_name, publisher, dataset_name, reference_period, url,
+accessed_at, artifact_filename, content_sha256`.
 
-```
-1 | Primary Care HPSA  | HRSA | Primary Care HPSA Spatial Coverage  | v0.1 source period | NULL | NULL
-2 | Dental HPSA        | HRSA | Dental HPSA Spatial Coverage        | v0.1 source period | NULL | NULL
-3 | Mental Health HPSA | HRSA | Mental Health HPSA Spatial Coverage | v0.1 source period | NULL | NULL
-4 | MUA/P              | HRSA | MUA/P Spatial Coverage              | v0.1 source period | NULL | NULL
-```
-
-CE-E12B target (design; not applied here):
+Every row:
 
 ```
-reference_period : "HRSA Data Warehouse snapshot 2026-08-29"   (all four rows)
-url              : "https://data.hrsa.gov/data/download"        (pending Q-D5 deep-link confirmation)
-accessed_at      : "2026-08-29"                                 (all four rows)
-content_sha256   : per-source processed-artifact sha-256 above  (new nullable column — schema change)
-artifact_filename: per-source Data/Processed filename above     (new nullable column — optional, Q-D2)
+reference_period  : "HRSA Data Warehouse snapshot 2026-08-29"
+url               : "https://data.hrsa.gov/data/download"
+accessed_at       : "2026-08-29"
+artifact_filename : per-source Data/Processed build-input workbook (table above)
+content_sha256    : SHA-256 of that workbook's bytes (table above)
 ```
 
-`seed_v01.sql` (INSERT OR IGNORE, `reference_period` `'v0.1 source period'`) and
-`build_v01_database.py` (`source_metadata` loop, `reference_period` = the
-`"v0.1"` period string) currently disagree on the placeholder value; CE-E12B
-aligns both to the target string.
+The prior `'v0.1 source period'` placeholder and the `NULL` `url` / `accessed_at`
+are gone. `seed_v01.sql` and `build_v01_database.py` were updated so a fresh
+build produces the same metadata (build recomputes `content_sha256` from the
+file it actually reads).
+
+CE-E12B changed **no** analytical value: `observation`, `normalized_measure`,
+`dimension_score`, and `composite_score` are byte-identical to the `ce-e12a`
+database (fingerprints in `migrate_v12_source_vintage.PRE_MIGRATION_ANALYTICAL`,
+enforced by the migration's own transactional check and by
+`tests/test_ce_e12_source_vintage.py`). `county_period.period` and
+`methodology.methodology_version` remain `v0.1`.
 
 ---
 
 # Known Limitations and Notes
 
-* **CE-E12A is documentation only.** No `.py`, `.sql`, `.sqlite`, frontend, or
-  test file is modified. The persisted `source` table still holds the
-  `v0.1 source period` placeholder and `NULL` `url` / `accessed_at` until
-  CE-E12B is authorized and run.
+* **CE-E12A was documentation only** (this catalogue, the design record, the
+  PROJECT_LOG entry). **CE-E12B** applied the design: the two new `source`
+  columns, the populated vintage/provenance metadata, the scoped migration, the
+  build/seed alignment, the API/frontend passthrough, and the coordinated
+  seven-anchor database-hash re-baseline. No automated scheduler / download
+  process was introduced.
+* **Hash reproducibility depends on the SQLite library version.** The migration
+  was run with SQLite 3.45.1; the recorded database sha-256
+  (`12b3525e…7174c`) is what that library produces from the `ce-e12a` database.
+  A different SQLite build could repack the file differently; the backend
+  anchors and `tests/test_ce_e12_source_vintage.py` would then fail loudly,
+  which is the intended tripwire.
 * **Artifacts are gitignored.** `Data/Raw/` and `Data/Processed/` are not
   committed. This document's recorded hashes are the in-repo identity of record;
   they let a future environment confirm it holds the same source vintage before

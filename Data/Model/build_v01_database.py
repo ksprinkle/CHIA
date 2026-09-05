@@ -1,4 +1,5 @@
 from pathlib import Path
+import hashlib
 import sqlite3
 import pandas as pd
 
@@ -116,6 +117,26 @@ VARIABLES = {
 
 SCHEMA_PATH = MODEL_DIR / "schema.sql"
 SEED_PATH = MODEL_DIR / "seed_v01.sql"
+
+
+# ------------------------------------------------------------
+# CE-E12B source-vintage / reproducibility metadata
+# ------------------------------------------------------------
+#
+# The v0.1 analytical sources are one HRSA Data Warehouse snapshot (every raw
+# record carries a uniform Data Warehouse Record Create Date of 2026-08-29).
+# artifact_filename / content_sha256 pin the exact Data/Processed build-input
+# workbook. Authoritative catalogue and verification snippet:
+# Documentation/ANALYTICAL_DATA_SOURCES.md.txt. These fields are presentation /
+# provenance only -- no analytical script reads the source table.
+
+SOURCE_REFERENCE_PERIOD = "HRSA Data Warehouse snapshot 2026-08-29"
+SOURCE_URL = "https://data.hrsa.gov/data/download"
+SOURCE_ACCESSED_AT = "2026-08-29"
+
+
+def file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 # ------------------------------------------------------------
@@ -636,6 +657,9 @@ def main():
 
             name, publisher, dataset = metadata
 
+            artifact_filename = SOURCE_FILES[key].name
+            content_sha256 = file_sha256(SOURCE_FILES[key])
+
             cursor = connection.execute(
                 """
                 SELECT source_id
@@ -654,15 +678,23 @@ def main():
                         source_name,
                         publisher,
                         dataset_name,
-                        reference_period
+                        reference_period,
+                        url,
+                        accessed_at,
+                        artifact_filename,
+                        content_sha256
                     )
-                    VALUES (?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         name,
                         publisher,
                         dataset,
-                        period,
+                        SOURCE_REFERENCE_PERIOD,
+                        SOURCE_URL,
+                        SOURCE_ACCESSED_AT,
+                        artifact_filename,
+                        content_sha256,
                     ),
                 )
 
@@ -670,6 +702,29 @@ def main():
 
             else:
                 source_ids[key] = result[0]
+
+            # Converge the row on the CE-E12B vintage metadata regardless of
+            # whether it was created here or by seed_v01.sql, and recompute the
+            # content hash from the file actually consumed by this build.
+            connection.execute(
+                """
+                UPDATE source
+                SET reference_period = ?,
+                    url = ?,
+                    accessed_at = ?,
+                    artifact_filename = ?,
+                    content_sha256 = ?
+                WHERE source_name = ?
+                """,
+                (
+                    SOURCE_REFERENCE_PERIOD,
+                    SOURCE_URL,
+                    SOURCE_ACCESSED_AT,
+                    artifact_filename,
+                    content_sha256,
+                    name,
+                ),
+            )
 
         # ----------------------------------------------------
         # Update variable source IDs

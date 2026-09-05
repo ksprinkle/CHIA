@@ -23,41 +23,66 @@ VALUES (
 );
 
 -- ============================================================
--- 2. SOURCE PLACEHOLDERS
+-- 2. SOURCE RECORDS
 -- ============================================================
--- Source records will be completed after exact source/workbook
--- mappings are verified.
+-- CE-E12B: authoritative source-vintage and reproducibility metadata.
+-- reference_period / url / accessed_at describe the HRSA Data Warehouse
+-- snapshot the v0.1 pipeline consumed; artifact_filename / content_sha256
+-- pin the exact Data/Processed build-input workbook (SHA-256 of its bytes).
+-- Full catalogue and verification: Documentation/ANALYTICAL_DATA_SOURCES.md.txt.
+-- These fields are presentation/provenance only -- no analytical script
+-- reads the source table.
 
 INSERT OR IGNORE INTO source (
     source_name,
     publisher,
     dataset_name,
-    reference_period
+    reference_period,
+    url,
+    accessed_at,
+    artifact_filename,
+    content_sha256
 )
 VALUES
 (
     'Primary Care HPSA',
     'HRSA',
     'Primary Care HPSA Spatial Coverage',
-    'v0.1 source period'
+    'HRSA Data Warehouse snapshot 2026-08-29',
+    'https://data.hrsa.gov/data/download',
+    '2026-08-29',
+    'CHIA_Primary_Care_HPSA_Spatial_Coverage_Validated_FINAL.xlsx',
+    '709e9ed6070f71e466b65b0928d1dbe23d3dd685ecfb81d4cb1cc0ee637c2d93'
 ),
 (
     'Dental HPSA',
     'HRSA',
     'Dental HPSA Spatial Coverage',
-    'v0.1 source period'
+    'HRSA Data Warehouse snapshot 2026-08-29',
+    'https://data.hrsa.gov/data/download',
+    '2026-08-29',
+    'CHIA_Dental_HPSA_Spatial_Coverage_Validated_FINAL.xlsx',
+    '3334807f5cd7ecbd2002e2a672705dfd1a7f2a36df43d313db0b234332c61065'
 ),
 (
     'Mental Health HPSA',
     'HRSA',
     'Mental Health HPSA Spatial Coverage',
-    'v0.1 source period'
+    'HRSA Data Warehouse snapshot 2026-08-29',
+    'https://data.hrsa.gov/data/download',
+    '2026-08-29',
+    'CHIA_Mental_Health_HPSA_Spatial_Coverage_Validated_FINAL.xlsx',
+    '72e6b52fa73247e6975ccb47bd09368bfc1f56f7a7f5ac14f95b8def67bb430b'
 ),
 (
     'MUA/P',
     'HRSA',
     'MUA/P Spatial Coverage',
-    'v0.1 source period'
+    'HRSA Data Warehouse snapshot 2026-08-29',
+    'https://data.hrsa.gov/data/download',
+    '2026-08-29',
+    'CHIA_MUA_P_Spatial_Coverage_Validated.xlsx',
+    '7e8b0fd83bed93f0a8d1f0939b79e7302a96fa218775dd7d7b41597ab922f218'
 );
 
 -- ============================================================

@@ -33,7 +33,7 @@ from app.services.state_scores import (
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_DATABASE = PROJECT_ROOT / "Data" / "Model" / "chia_v01.sqlite"
 EXPECTED_PRODUCTION_SHA256 = (
-    "0d8bb417ccf72acf0cef7d17bcca15627900d0df419fc259de553a95b9aa2966"
+    "12b3525e77cdc85ba7fedbb463fcc75f21c489825c0e81d98cdf71a2b7c7174c"
 )
 EXPECTED_COUNTY_COUNT = 3143
 

@@ -507,9 +507,15 @@ code {
 
 .dimension__measure code,
 .dimension-provenance__meta code,
-.evidence__variable {
+.evidence__variable,
+.provenance__artifact {
   font-size: 0.8125rem;
   color: var(--color-muted);
+  word-break: break-all;
+}
+
+/* CE-E12B source-vintage provenance: keep long URLs inside the disclosure */
+.provenance__link {
   word-break: break-all;
 }
 

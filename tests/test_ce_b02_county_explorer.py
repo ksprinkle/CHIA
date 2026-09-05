@@ -32,7 +32,7 @@ from app.services.county_explorer import (
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_DATABASE = PROJECT_ROOT / "Data" / "Model" / "chia_v01.sqlite"
 EXPECTED_PRODUCTION_SHA256 = (
-    "0d8bb417ccf72acf0cef7d17bcca15627900d0df419fc259de553a95b9aa2966"
+    "12b3525e77cdc85ba7fedbb463fcc75f21c489825c0e81d98cdf71a2b7c7174c"
 )
 EXPECTED_COUNTY_COUNT = 3143
 
@@ -47,7 +47,8 @@ CREATE TABLE county_period (
 );
 CREATE TABLE source (
     source_id INTEGER PRIMARY KEY, source_name TEXT NOT NULL, publisher TEXT,
-    dataset_name TEXT, reference_period TEXT, url TEXT, accessed_at TEXT
+    dataset_name TEXT, reference_period TEXT, url TEXT, accessed_at TEXT,
+    artifact_filename TEXT, content_sha256 TEXT
 );
 CREATE TABLE methodology (
     methodology_version TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT,
@@ -140,9 +141,11 @@ def build_explorer_db(path: Path, counties: list[dict]) -> None:
     )
     for source_id in (1, 2, 3, 4):
         connection.execute(
-            "INSERT INTO source VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO source VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (source_id, f"Source {source_id}", "HRSA", f"Dataset {source_id}",
-             "v0.1 source period", None, None),
+             "HRSA Data Warehouse snapshot 2026-08-29",
+             "https://data.hrsa.gov/data/download", "2026-08-29",
+             f"artifact_{source_id}.xlsx", f"{source_id:064x}"),
         )
     for dimension_id, name, description, primary_var, supporting, source_id, _norm in DIMENSIONS:
         for variable_id in (primary_var, *supporting):

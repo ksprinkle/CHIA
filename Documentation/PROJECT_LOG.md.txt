@@ -342,4 +342,39 @@ Documentation-only change. Existing gate re-run and unchanged: frontend `vitest 
 
 ---
 
+# Version 0.2.0 — County Explorer v0.2 UX: Source Vintage Metadata Implementation (CE-E12B)
+
+**Date:** September 5, 2026
+
+## Scope
+
+Implements the CE-E12A design. Establishes authoritative source-vintage and reproducibility metadata on the canonical database **without changing any analytical value**. Because `Data/Model/chia_v01.sqlite` is byte-pinned, this necessarily includes the coordinated re-baseline of the database-hash anchors.
+
+## Changes
+
+- **Schema.** `source` gains two additive nullable `TEXT` columns (`artifact_filename`, `content_sha256`).
+- **Data.** All four `source` rows populated: `reference_period` = `HRSA Data Warehouse snapshot 2026-08-29` (was `v0.1 source period`), `url` = `https://data.hrsa.gov/data/download`, `accessed_at` = `2026-08-29`, `artifact_filename` = the exact `Data/Processed` build-input workbook, `content_sha256` = SHA-256 of that workbook's bytes. `county_period.period` and `methodology.methodology_version` remain `v0.1`.
+- **Migration.** `Data/Model/migrate_v12_source_vintage.py` (new) — scoped, transactional, `source`-only (not a full rebuild). Captures an exact fingerprint of `observation` / `normalized_measure` / `dimension_score` / `composite_score`, applies the schema + `source` updates in one transaction, and aborts unless the analytical fingerprint is byte-identical afterward; `PRAGMA foreign_key_check` clean. Idempotent. Run once with SQLite 3.45.1.
+- **Build/seed.** `seed_v01.sql` and `build_v01_database.py` updated so a fresh build reproduces the metadata (build recomputes `content_sha256` from the file it reads).
+- **API/presentation.** `SourceRef` (backend + frontend) and `_load_provenance` carry the two new fields; the page-level `ProvenancePanel` “Sources” disclosure now shows source download link, accessed date, source file, and SHA-256 per source; the CE-E11 per-county CSV gains `source_artifact_filename` / `source_content_sha256` (29 → 31 columns), blank on supporting/composite rows as before.
+- **Re-baseline.** New canonical database identity (SQLite 3.45.1): sha-256 `12b3525e77cdc85ba7fedbb463fcc75f21c489825c0e81d98cdf71a2b7c7174c`, md5 `1ff3f2731c96d7dcab4491b8ac53765d` (was `0d8bb417…a2966` / `f53b3de1…3b5a4`). `EXPECTED_PRODUCTION_SHA256` updated in all six anchors (`test_ce_a06`, `test_ce_b01`, `test_ce_b02`, `test_ce_d01_concurrent_connection`, `test_ce_d01_county_reference_correction`, `test_ce_e09`); `test_ce_b02` fixture `source` schema/insert extended.
+
+## Reproducibility
+
+`tests/test_ce_e12_source_vintage.py` (new, 14 tests): every source has complete, non-null vintage/provenance metadata; `content_sha256` matches both the on-disk artifact and `ANALYTICAL_DATA_SOURCES.md.txt`; `observation`/`normalized_measure`/`dimension_score`/`composite_score` count + ordered-content SHA-256 equal the pre-migration (`ce-e12a`) fingerprint; the five v0.1 validators exit 0; the API exposes the new fields; the migration is idempotent; the new hash is present in every anchor and the old hash in none.
+
+## Validation
+
+Backend `python -m unittest discover -s tests` 153/153 (139 + 14 CE-E12); the five v0.1 analytical validators + `validate_v02_geographic_join.py` PASSED; frontend `vitest run` 232/232 (22 files); `eslint --max-warnings 0` clean; `tsc && vite build` clean; `chia_v01.sqlite` sha-256 `12b3525e…7174c` / md5 `1ff3f273…765d`; analytical tables byte-identical to `ce-e12a`.
+
+## Constraints
+
+`county_period.period` unchanged; methodology semantics unchanged; no analytical formula touched; scoped migration, not a rebuild; no automated scheduler/download; no State/County selector change (CE-E13); not pushed. Full record: `Documentation/CE_E12B_Source_Vintage_Implementation.md.txt`.
+
+## Status
+
+**Implemented; full gate green; pending review, then commit/tag authorization.** Not committed, not pushed.
+
+---
+
 *This log serves as the historical record of significant project decisions, milestones, and direction. It documents not only what changed, but why those decisions were made.*
