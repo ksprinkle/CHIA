@@ -271,4 +271,40 @@ Complete. No new dependencies, no browser-automation tooling, no backend/API/dat
 
 ---
 
+# Version 0.2.0 — County Explorer v0.2 UX: End-to-End Acceptance (CE-E08) — v0.2 UX BASELINE
+
+**Date:** September 5, 2026
+
+## Scope
+
+Final acceptance of the redesigned County Explorer (§14 CE-E08). An acceptance slice: no product behaviour added. It ratifies the CHIA County Explorer v0.2 UX baseline delivered by CE-E01–CE-E07 — the geography-first journey (§3.1): U.S. map → state → county → visual profile → dimension → evidence → underlying data → methodology/provenance, with geographic context visible and announced throughout.
+
+## Journey verification
+
+Added `frontend/src/e2e-journey.test.tsx` (`describe('CE-E08 end-to-end acceptance')`, 3 tests, jsdom, no new tooling): the complete journey driven entirely by map selection (U.S. map click → state, state map click → county), asserting the breadcrumb, the CE-E07 route announcement ("Viewing {county}, {state}"), a single Explorer fetch, the four-dimension snapshot, one dimension's full drill-down trail (underlying data → evidence → dimension-scoped methodology → dimension-scoped provenance, correctly not mixed with other dimensions), the retained page-level Methodology/Sources panels, and context preservation + re-announcement on backward navigation (§3.5, §3.8). 3/3 pass.
+
+## CE-D01 analytical foundation — unchanged (verified)
+
+- **Source (git `ce-d01..HEAD`):** the only changes under `app/`, `Data/Model/`, `tests/` since `ce-d01` are three additive CE-E01 geographic-foundation files. `app/` (API, schemas, services incl. the normalization/observation pipeline), every `Data/Model/*.py` v0.1 build/normalize/score/validate script, `schema.sql`, `seed_v01.sql`, all CE-A/B/D test suites, and `requirements.txt` are byte-for-byte unchanged. `frontend/src/lib/interpretation.ts` / `dimensions.ts` / `types.ts` unchanged since `ce-d01`.
+- **Data (md5):** `Data/Model/chia_v01.sqlite` md5 `f53b3de17b627b3b02796df9de33b5a4`, identical before and after the full verification run — the analytical layer is strictly read-only.
+- **Behaviour:** backend suite 122/122 OK (incl. `test_ce_a06` production byte-identical + tamper detection, `test_ce_d01` DB SHA baseline + analytical-values spot check, `test_ce_b02` read-only digest); `validate_v01_database`, `validate_v01_normalization`, `validate_v01_dimension_scores`, `validate_v01_composite`, `validate_v01_county_explorer`, and `validate_v02_geographic_join` all PASSED.
+
+## Full regression
+
+Frontend 183/183 (18 files); `npm run lint` clean; `tsc && vite build` clean; backend 122/122; 6 validators PASSED.
+
+## Scope boundary
+
+The v0.2 UX baseline is the §14 geography-first journey. §3.2 measure-first journey, §3.3 county search, §3.6 change-measure-in-place, and §3.7 a dedicated reset control are **not part of the v0.2 §14 scope** (they depend on the §7 analytical-map / measure-selector capability, which §14 never scheduled and CE-E02–E07 did not build) — candidate v0.3 roadmap items.
+
+## Residual
+
+The CE-E07 manual browser / screen-reader / touch-device / reduced-motion checklist (`Documentation/CE_E07_Accessibility_Responsive_Validation.md.txt` §6) could not be executed in this environment (no browser automation, no AT, no devices) and is **not** represented as passed. It is carried forward as an explicit, itemised residual in `Documentation/CE_E08_EndToEnd_Acceptance.md.txt` §6 for a human validator against a running build.
+
+## Status
+
+**CHIA County Explorer v0.2 UX baseline established.** Journey acceptance complete; CE-D01 analytical foundation verified unchanged; backward compatibility (§13.11) verified; full regression green. Gate met at the automated-acceptance + code-audit level, with the CE-E07 manual checklist as a documented residual. No application source, backend, API, schema, database, analytical, geographic, or dependency change in CE-E08. Full acceptance record: `Documentation/CE_E08_EndToEnd_Acceptance.md.txt`.
+
+---
+
 *This log serves as the historical record of significant project decisions, milestones, and direction. It documents not only what changed, but why those decisions were made.*

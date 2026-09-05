@@ -1,0 +1,227 @@
+# CHIA County Explorer v0.2 UX — CE-E08 End-to-End Acceptance
+
+**Slice:** CE-E08 — End-to-End Acceptance (final slice of §14)
+**Governing specification:** `Documentation/CHIA_County_Explorer_UX_v0.2_Implementation_Specification.md` — §14 (CE-E08), §3 (Relationship to CE-D01; User Journeys), §13.11 (backward compatibility), §9.13.
+**Baseline entering CE-E08:** `ce-e07` — `9d82ab265e03a1a73cc437079c3d14cf067ce176`
+**CE-D01 reference point:** `ce-d01` — `3a984c79aa968f49b60359c92aa900dbb4ba4e4a`
+**Date:** 2026-09-05
+
+CE-E08 gate (verbatim): *"CHIA County Explorer v0.2 UX baseline."*
+CE-E08 purpose (verbatim): *"Final acceptance of the redesigned County Explorer. Validate the complete journey: U.S. → State → County → Visual Profile → Dimension → Evidence → Underlying Data → Methodology. This should also verify that the CE-D01 analytical foundation remains unchanged."*
+
+CE-E08 is an **acceptance slice**. It adds no product behaviour. Its only
+code artefact is one consolidated end-to-end journey test
+(`frontend/src/e2e-journey.test.tsx`); its other artefacts are this record
+and a `PROJECT_LOG.md.txt` entry.
+
+---
+
+## 1. The v0.2 UX baseline — scope statement
+
+The CHIA County Explorer v0.2 UX baseline delivers the **geography-first
+journey** (§3.1), implemented across CE-E01–CE-E07:
+
+```
+U.S. map  →  State (map or accessible selector)  →  County (map or accessible selector)
+          →  Visual County Profile (breadcrumb, identity, four-dimension snapshot,
+             CE-E05 indicators, "What Stands Out?" interpretation)
+          →  Dimension  →  "Investigate" drill-down:
+                Underlying Data  →  Evidence  →  Methodology (scoped + page-level)
+                                              →  Provenance (scoped + page-level)
+```
+
+with geographic context continuously visible (state heading + "United
+States" link; county breadcrumb `United States → {State} → {County}` with
+`aria-current="page"`) and announced to assistive technology on every
+client-side transition (CE-E07 route announcer).
+
+### Explicitly NOT part of the v0.2 §14 baseline
+
+The specification's §3 also describes the following, for which §14 allocated
+**no implementation slice** and which CE-E02–CE-E07 did not build. They are
+**out of scope for the v0.2 UX baseline** and are candidate v0.3 roadmap
+items (they depend on the §7 analytical-map / measure-selector capability,
+which is likewise unbuilt — see CE-E07's validation record §3):
+
+- §3.2 Measure-first journey (measure selector; analytical/choropleth map)
+- §3.3 County name search
+- §3.6 Change the active measure without restarting the journey
+- §3.7 A dedicated "reset to neutral U.S. map" control (browser navigation
+  and the "United States" breadcrumb/back links serve the practical need)
+- §3.4 "selected measure emphasized on profile entry" (N/A — no measure
+  feature exists)
+
+This boundary is recorded so the baseline is never read as claiming those
+features.
+
+---
+
+## 2. Journey acceptance — automated
+
+**Artefact:** `frontend/src/e2e-journey.test.tsx` —
+`describe('CE-E08 end-to-end acceptance')`, 3 tests, jsdom, no new tooling.
+
+| Test | What it proves |
+|---|---|
+| *completes the geography-first journey from the U.S. map to the County Profile, entirely by map selection* | `renderApp(['/'])` → click a state **on `UsStateMap`** → `/states/01`, state `<h1>` → click a county **on `StateCountyMap`** → `/counties/01001`, county `<h1>` → breadcrumb shows `United States`(link `/`) → `Alabama`(link `/states/01`) → `Autauga County`(`aria-current="page"`) → CE-E07 live region announces `"Viewing Autauga County, Alabama"` → the Explorer read model was fetched exactly once for `01001` → the four-dimension snapshot renders all four dimensions with value + unit (`3 × "percentile"`, `1 × "% coverage"`). |
+| *reaches a dimension and its full analytical trail … from the map-driven arrival* | From that same map-driven profile: the Primary Care dimension **Result** (`88`) is visible with no interaction → opening the single native `Investigate Primary Care Access` `<details>` reveals **Underlying Data** (`Primary Care Access primary measure`), **Evidence** (`Supporting evidence`), **Methodology** scoped to the dimension (`Primary Care Access calculation method.`, and *not* `Dental Access calculation method.`), **Provenance** scoped to the dimension's source (`Primary Care HPSA`, and *not* `Dental HPSA`) → the comprehensive page-level `Methodology` and `Sources` regions remain present. |
+| *preserves and re-announces the geographic context on backward navigation* (§3.5, §3.8) | From the county profile, `history.back()` → `/states/01`, state `<h1>`, announcer re-announces `"Viewing Alabama"` → `history.back()` again → `/`, home `<h1>`, U.S. map present. |
+
+**Result:** 3 / 3 pass. Full frontend suite after CE-E08: **183 / 183** across
+**18** files (`e2e-journey.test.tsx` new; the 180 pre-existing tests
+unchanged). `npm run lint` clean. `tsc && vite build` clean.
+
+Each journey stage additionally retains its own dedicated unit coverage:
+`UsStateMap.test` / `StateSelect.test` / `routing.test` (CE-E02);
+`StateCountyMap.test` / `CountySelectForState.test` / `StatePage.test` /
+`routing.test` (CE-E03); `CountyPage.test` (CE-C03…CE-E06);
+`accessibility.test` (CE-E07 — map↔selector parity, route announcer,
+landmarks, colour independence).
+
+---
+
+## 3. CE-D01 analytical foundation — unchanged (verified)
+
+§3 (lines 83–99) requires the CE-D01 analytical foundation to remain
+authoritative and unchanged: source data, observation pipeline,
+normalization methodology, dimension scores, composite calculation,
+validation, provenance, zero-value handling, missing-value handling.
+
+### 3.1 Source-level immutability (git, `ce-d01..HEAD`)
+
+`git diff --name-only ce-d01..HEAD -- app/ Data/Model/ tests/ requirements.txt`
+returns **exactly three files, all additive, all CE-E01 geographic
+foundation**:
+
+```
+Data/Model/convert_v02_geographic_boundaries.py   (new; build-time geo asset conversion)
+Data/Model/validate_v02_geographic_join.py        (new; geo↔FIPS join validator)
+tests/test_ce_e01_geographic_foundation.py        (new; geo foundation tests)
+```
+
+Therefore, since `ce-d01`:
+
+- **`app/`** (FastAPI app, `app/api/**`, `app/schemas/**`, `app/services/**`
+  incl. `normalization.py`, `normalization_processing.py`,
+  `observation_processing.py`, `county_explorer.py`, `county_directory.py`)
+  — **zero modifications**.
+- **v0.1 analytical pipeline** (`Data/Model/build_v01_database.py`,
+  `normalize_v01_database.py`, `build_v01_dimension_scores.py`,
+  `build_v01_composite_scores.py`, `schema.sql`, `seed_v01.sql`, and all
+  `validate_v01_*.py`) — **zero modifications**.
+- **CE-A/B/D test suites** (`tests/test_ce_a0*.py`, `tests/test_ce_b0*.py`,
+  `tests/test_ce_d01_*.py`) — **zero modifications**.
+- **`requirements.txt`** — **unchanged**. No backend dependency added in the
+  entire CE-E series.
+- The frontend performs no analytical calculation (`frontend/src/lib/types.ts`
+  contract). `frontend/src/lib/interpretation.ts` (the only client-side
+  derivation, CE-C05 "What Stands Out", which applies persisted rules) and
+  `frontend/src/lib/dimensions.ts` / `types.ts` / `countyExplorer.tsx` /
+  `apiClient.ts` are **unchanged since `ce-d01`**.
+
+### 3.2 Data-level immutability (md5)
+
+`Data/Model/chia_v01.sqlite` (the v0.1 analytical database; gitignored):
+
+```
+BEFORE verification : f53b3de17b627b3b02796df9de33b5a4
+AFTER  verification : f53b3de17b627b3b02796df9de33b5a4   (identical)
+```
+
+Identical before and after the full backend suite and all five v0.1
+analytical validators — the analytical layer and its harness are strictly
+read-only.
+
+### 3.3 Behavioural verification (all green, read-only)
+
+| Check | Result |
+|---|---|
+| Backend suite — `python -m unittest discover -s tests` | **122 / 122 OK** (includes `test_ce_a06_county_explorer_validation`: production-DB byte-identical + full validation + tamper detection; `test_ce_d01_county_reference_correction`: DB SHA baseline, analytical row counts, analytical-values spot check; `test_ce_b02`: `read_only_database_digest_unchanged`, `service_does_not_mutate_the_database`) |
+| `Data/Model/validate_v01_database.py` | `VALIDATION PASSED` |
+| `Data/Model/validate_v01_normalization.py` | `NORMALIZATION VALIDATION PASSED` |
+| `Data/Model/validate_v01_dimension_scores.py` | `DIMENSION SCORE VALIDATION PASSED` |
+| `Data/Model/validate_v01_composite.py` | `EXPERIMENTAL COMPOSITE VALIDATION PASSED (Experimental / Provisional)` |
+| `Data/Model/validate_v01_county_explorer.py` | `FULL ANALYTICAL VALIDATION PASSED` |
+| `Data/Model/validate_v02_geographic_join.py` (CE-E01) | `ALL CHECKS PASSED` |
+
+### 3.4 Conclusion
+
+The CE-D01 analytical foundation is **unchanged** — verified at the source
+level (git), the data level (md5), and the behavioural level (122 backend
+tests + 6 validators). The CE-E08 commit itself adds only a frontend test
+file and two documentation files; it introduces no analytical, backend,
+schema, data, or geographic change.
+
+---
+
+## 4. §13.11 backward compatibility
+
+`app/` is byte-for-byte unchanged since `ce-d01`; `test_ce_b01_county_api`
+and `test_ce_b02_county_explorer` (23 tests) are green. Existing validated
+API contracts (`GET /api/v1/counties`, `GET /api/v1/counties/{fips}/explorer`)
+remain valid and are consumed unchanged by the redesigned frontend.
+
+---
+
+## 5. Full regression at acceptance
+
+| Suite | Command | Result |
+|---|---|---|
+| Frontend unit/integration | `npx vitest run` | **183 / 183**, 18 files |
+| Frontend lint | `npm run lint` (`eslint --max-warnings 0`) | clean |
+| Frontend build | `npm run build` (`tsc && vite build`) | success |
+| Backend | `python -m unittest discover -s tests` | **122 / 122 OK** |
+| v0.1 analytical validators (×5) | see §3.3 | all PASSED |
+| CE-E01 geographic validator | `validate_v02_geographic_join.py` | ALL CHECKS PASSED |
+
+---
+
+## 6. Open residual — CE-E07 manual browser / screen-reader / device checklist
+
+CE-E07 delivered an execution-ready manual validation checklist
+(`Documentation/CE_E07_Accessibility_Responsive_Validation.md.txt` §6):
+real-browser rendering at desktop / tablet / mobile viewports, NVDA / JAWS /
+VoiceOver read-throughs, physical touch-device interaction, and the
+`prefers-reduced-motion` OS setting. **This environment has no browser
+automation, no assistive technology, and no physical devices, so those
+checks were not executed and are NOT represented as passed.**
+
+Per the approved CE-E08 scope (investigation §8, Decision 1), the v0.2 UX
+baseline (`ce-e08`) is declared on **automated acceptance + code audit**
+(journey test green; CE-D01 provably unchanged; full regression green), with
+the CE-E07 manual checklist carried forward as an **explicit, itemised
+residual for a human validator to complete against a running build**:
+
+- [ ] CE-E07 §6.1 keyboard pass (3 screens + drill-down)
+- [ ] CE-E07 §6.2 screen-reader pass (NVDA and/or VoiceOver), incl. route-announcer behaviour
+- [ ] CE-E07 §6.3 responsive pass at ~1280 / ~768 / ~375 px
+- [ ] CE-E07 §6.4 touch pass on a physical device
+- [ ] CE-E07 §6.5 reduced-motion pass with the OS setting enabled
+- [ ] CE-E07 §6.6 colour-independence (greyscale) pass
+
+Any concrete defect surfaced by the above returns as a separately-approved
+fix; it does not retroactively invalidate the automated baseline.
+
+---
+
+## 7. CE-E08 acceptance status
+
+- **Journey (§3.1 / §14):** COMPLETE — verified end-to-end by
+  `frontend/src/e2e-journey.test.tsx` (3/3), every stage from the U.S. map
+  through Methodology/Provenance reachable in one continuous map-driven
+  flow, geographic context visible and announced throughout, and preserved
+  on backward navigation.
+- **CE-D01 analytical foundation unchanged (§3):** VERIFIED — git source
+  immutability, md5 data immutability, 122 backend tests, 6 validators.
+- **Backward compatibility (§13.11):** VERIFIED.
+- **Full regression:** GREEN (183 frontend + 122 backend + 6 validators).
+- **Scope boundary:** the v0.2 UX baseline is the §14 geography-first
+  journey; §3.2 / §3.3 / §3.6 / §3.7 are explicitly out of scope (§1).
+- **Residual:** the CE-E07 manual browser/AT/device checklist (§6), carried
+  forward, not represented as complete.
+- **No** application source, backend, API, schema, database, analytical,
+  geographic, or dependency change in CE-E08.
+
+**Gate — "CHIA County Explorer v0.2 UX baseline" — met at the automated
+acceptance + code-audit level, with the §6 manual checklist as a documented
+residual.**
