@@ -14,30 +14,33 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+// CE-E13: the state route also renders a "County in <state>" control, so the
+// app-level county selector is matched by its exact "County" name.
 async function findSelect(): Promise<HTMLSelectElement> {
   return (await screen.findByRole('combobox', {
-    name: /county/i,
+    name: /^county$/i,
   })) as HTMLSelectElement
 }
 
 describe('CE-C02 county selection & URL state', () => {
-  it('starts with no county assumed at "/"', async () => {
+  it('starts with no county assumed at "/" (county selector disabled until a state is chosen)', async () => {
     stubCountiesFetch(makeCounties(['01001', '01003']))
     const { router } = renderApp(['/'])
 
     const select = await findSelect()
     expect(select.value).toBe('')
+    expect(select).toBeDisabled()
     expect(router.state.location.pathname).toBe('/')
     expect(screen.getByText(/no county is currently selected/i)).toBeInTheDocument()
   })
 
-  it('selecting a county updates the URL and renders that county profile', async () => {
+  it('selecting a county from a state route updates the URL and renders that county profile', async () => {
     stubApi({
       counties: makeCounties(['01001', '01003']),
       explorer: (fips) =>
         makeExplorer(fips, { county: { county_name: `County ${fips}` } }),
     })
-    const { router } = renderApp(['/'])
+    const { router } = renderApp(['/states/01'])
 
     fireEvent.change(await findSelect(), { target: { value: '01001' } })
 
@@ -66,7 +69,7 @@ describe('CE-C02 county selection & URL state', () => {
 
   it('honours browser back and forward navigation', async () => {
     stubCountiesFetch(makeCounties(['01001', '01003']))
-    const { router } = renderApp(['/'])
+    const { router } = renderApp(['/states/01'])
 
     fireEvent.change(await findSelect(), { target: { value: '01001' } })
     await waitFor(() =>
@@ -109,7 +112,7 @@ describe('CE-C02 county selection & URL state', () => {
       counties: makeCounties(['01001', '01003']),
       explorer: (fips) => makeExplorer(fips),
     })
-    const { router } = renderApp(['/'])
+    const { router } = renderApp(['/states/01'])
     await findSelect()
 
     expect(

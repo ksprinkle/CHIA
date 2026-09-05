@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useParams } from 'react-router-dom'
 
 import { useCountyDirectory } from '../lib/countyDirectory'
+import { deriveStates, stateFipsFromRoute } from '../lib/states'
 import { CountySelector } from './CountySelector'
+import { StateSelect } from './StateSelect'
 
 export interface LayoutProps {
   /**
@@ -80,11 +82,26 @@ function RouteAnnouncer() {
 
 /**
  * Application shell: skip link, a polite route-change announcer (CE-E07),
- * header region (with an empty slot for CE-C03), an app-level
- * county-selection navigation region (CE-C02), and the main content
- * landmark. No Explorer / analytical data is rendered here.
+ * the header (title + the CE-E13 `StateSelect`, to the right of the title),
+ * the app-level county-selection navigation region (CE-C02, state-gated by
+ * CE-E13), and the main content landmark. No Explorer / analytical data is
+ * rendered here.
+ *
+ * CE-E13 puts state selection first: `StateSelect` lives in the header on
+ * every route and reflects the state in context (`stateFipsFromRoute`); the
+ * county-selection nav that follows it holds the state-gated `CountySelector`.
+ * Both derive from the one shared county directory -- no second state or
+ * county list.
  */
 export function Layout({ header, children }: LayoutProps) {
+  const directory = useCountyDirectory()
+  const params = useParams<{ stateFips?: string; countyFips?: string }>()
+  const ready = directory.status === 'ready'
+  const states = ready ? deriveStates(directory.counties) : []
+  const currentStateFips = ready
+    ? stateFipsFromRoute(directory.counties, params) ?? ''
+    : ''
+
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">
@@ -92,7 +109,10 @@ export function Layout({ header, children }: LayoutProps) {
       </a>
       <RouteAnnouncer />
       <header className="app-header">
-        <p className="app-title">CHIA County Explorer</p>
+        <div className="app-header__bar">
+          <p className="app-title">CHIA County Explorer</p>
+          {ready ? <StateSelect states={states} value={currentStateFips} /> : null}
+        </div>
         {header ? <div className="app-header__slot">{header}</div> : null}
       </header>
       <nav className="app-county-nav" aria-label="County selection">

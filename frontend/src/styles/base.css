@@ -111,6 +111,24 @@ body {
   padding: var(--space-3);
 }
 
+/* CE-E13: title on the left, the State selector on the right, wrapping on
+   narrow viewports. */
+.app-header__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.app-header .state-select {
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--space-2);
+  max-width: none;
+  margin-top: 0;
+}
+
 .app-title {
   margin: 0;
   font-weight: 600;

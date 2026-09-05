@@ -11,6 +11,7 @@ import { ProvenancePanel } from '../components/ProvenancePanel'
 import { SupportingEvidence } from '../components/SupportingEvidence'
 import { useCountyDirectory } from '../lib/countyDirectory'
 import { DIMENSION_ORDER } from '../lib/dimensions'
+import { deriveDataVintage } from '../lib/provenance'
 import { CountyExplorerProvider, useCountyExplorer } from '../lib/countyExplorer'
 import type { AccessProfile, DimensionProfile, SourceRef } from '../lib/types'
 
@@ -442,6 +443,11 @@ function CountyProfile({ stateFips }: { stateFips: string }) {
     provenance,
   } = explorer.data
 
+  // CE-E13: the header shows the source-data vintage (CE-E12B provenance),
+  // derived -- not hard-coded. The analytical period (`period.value`) and
+  // methodology version remain `v0.1` and are surfaced by MethodologyPanel.
+  const dataVintage = deriveDataVintage(provenance.sources)
+
   return (
     <section className="county-profile" aria-labelledby="county-profile-heading">
       <header className="county-profile__header">
@@ -459,10 +465,12 @@ function CountyProfile({ stateFips }: { stateFips: string }) {
             <dt>FIPS</dt>
             <dd>{county.county_fips}</dd>
           </div>
-          <div>
-            <dt>Period</dt>
-            <dd>{period.value}</dd>
-          </div>
+          {dataVintage ? (
+            <div>
+              <dt>Data vintage</dt>
+              <dd>{dataVintage}</dd>
+            </div>
+          ) : null}
           <div>
             <dt>Data completeness</dt>
             <dd>{formatCompleteness(period.completeness_status)}</dd>

@@ -81,14 +81,18 @@ describe('CountyPage (CE-C03 county profile)', () => {
       level: 1,
       name: /autauga county/i,
     })
-    // Scope to the profile <header>: CE-C04's methodology panel legitimately
-    // also renders "v0.1" (methodology version), so the period assertion is
-    // pinned to the header where it belongs.
     const header = heading.closest('header') as HTMLElement
     expect(within(header).getByText('Alabama (AL)')).toBeInTheDocument()
     expect(within(header).getByText('01001')).toBeInTheDocument()
-    expect(within(header).getByText('v0.1')).toBeInTheDocument()
     expect(within(header).getByText('Complete')).toBeInTheDocument()
+
+    // CE-E13: the header shows the source-data vintage (CE-E12B provenance),
+    // derived from the sources' shared reference period -- not the analytical
+    // "Period: v0.1", which was confusing next to the real vintage.
+    expect(within(header).getByText('Data vintage')).toBeInTheDocument()
+    expect(within(header).getByText('2026-08-29')).toBeInTheDocument()
+    expect(within(header).queryByText('Period')).toBeNull()
+    expect(within(header).queryByText('v0.1')).toBeNull()
   })
 
   it('renders the four dimensions in canonical order with descriptions', async () => {
