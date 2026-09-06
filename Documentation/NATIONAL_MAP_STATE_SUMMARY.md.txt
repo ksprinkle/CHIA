@@ -1,0 +1,82 @@
+# Community Health Intelligence Atlas (CHIA)
+
+# National Map — Per-State Summary of County Scores
+
+## Purpose
+
+The v0.2 County Explorer national (U.S.) map can, in measure mode, colour each
+state by the selected access dimension (governing v0.2 UX specification §4.6,
+§7.2). CHIA has **no state-level analytical score** — every persisted analytical
+value is county-level. This document defines the single, deterministic
+**display-only** aggregation used to give a state a colour, so that colour is
+reproducible from a specification and is never mistaken for a validated CHIA
+state score.
+
+Backend implementation: **CE-E14a** — `GET /api/v1/states/dimension-scores`
+(`app/api/v1/national_scores.py`, `app/services/national_scores.py`,
+`app/schemas/national_scores.py`). Frontend consumption is CE-E14b.
+
+---
+
+# The aggregation rule
+
+For each state / state-equivalent, and each of the four access dimensions
+(`PRIMARY_CARE`, `DENTAL`, `MENTAL_HEALTH`, `MUA_P`):
+
+> **state value = the median of that state's counties' persisted v0.1
+> `dimension_score.score` for the dimension.**
+
+* **Median** = `statistics.median`: the middle value for an odd count; the
+  **mean of the two central values** for an even count.
+* Counties whose score is **NULL / absent** (no `county_period` row, no
+  `dimension_score` row, or a persisted NULL) are **excluded** from the median.
+* A state with **no** contributing county for a dimension →
+  `median = null`, `available = false`, `available_county_count = 0`.
+* **All 51** states / state-equivalents are always represented, ordered by
+  `state_fips` ascending.
+* Each dimension is medianed **on its own values**. `MUA_P` is a raw
+  geographic-coverage percentage, not a percentile; the frontend must keep it
+  on its own scale/legend (governing spec §7.4) — the endpoint only returns the
+  number.
+
+The response also carries `period = "v0.1"` and an `aggregation` string
+restating this rule.
+
+### Why median (and not mean or population-weighting)
+
+* **Mean** — rejected: averaging ordinal county percentile ranks implies an
+  interval precision the scores do not carry, and is unstable for small-*n*
+  states (DC has 1 county, DE has 3).
+* **Median** — chosen: robust, no distributional assumption, and stays inside
+  the measure's existing semantics ("the typical county in this state sits at
+  the *N*th national percentile / at *N*% MUA/P coverage"). Degrades cleanly to
+  the single county's value when *n* = 1.
+* **Population-weighted mean** — rejected for v0.1: county population is not in
+  the analytical database, and a population-weighted figure would be a new
+  analytical claim (governing spec §4.10).
+
+---
+
+# What this is — and is not
+
+| It **is** | It is **not** |
+| --- | --- |
+| a request-time summary of already-persisted county scores | a persisted value — nothing is written; no new table, column, or migration |
+| a pure deterministic function of `dimension_score` + the county universe | a new CHIA analytical methodology — `methodology.methodology_version` stays `v0.1` |
+| provenance-inheriting: methodology `v0.1`, source vintage `HRSA Data Warehouse snapshot 2026-08-29` (CE-E12B) | a validated state-level healthcare-access ranking |
+| read-only — `chia_v01.sqlite` is byte-unchanged (SHA-256 `12b3525e…7174c`) | anything that touches analytical scripts, SQL, or the six production SHA anchors |
+
+Because it is computed live from the persisted county scores, the state colour
+is reproducible from: (1) the canonical database identity
+(SHA-256 `12b3525e77cdc85ba7fedbb463fcc75f21c489825c0e81d98cdf71a2b7c7174c`),
+(2) methodology version `v0.1`, (3) the rule above.
+
+---
+
+# Frontend labelling requirement (CE-E14b)
+
+When the national map is coloured by a measure, the UI must make clear that a
+state's colour is **a median of that state's counties**, distinct from the
+state map, where each county is coloured by its own score. The legend / caption
+must not present the state colour as a single authoritative state score, and
+`MUA_P` must not share the percentile legend.

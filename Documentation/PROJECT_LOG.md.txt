@@ -377,4 +377,34 @@ Backend `python -m unittest discover -s tests` 153/153 (139 + 14 CE-E12); the fi
 
 ---
 
+# Version 0.2.0 — County Explorer v0.2 UX: National Map Analytical Coloring — Backend Endpoint (CE-E14a)
+
+**Date:** September 5, 2026
+
+## Scope
+
+Backend-only. Adds the read-only endpoint the CE-E14b national-map measure view will consume, without inventing a state-level analytical score. Approved decisions (D1–D7): colour the 51 states with a display-only **median** of their counties' persisted `dimension_score` (no population weighting); no `methodology_version` bump — treat it as a documented, request-time presentational aggregate; add `GET /api/v1/states/dimension-scores`; defer the Experimental Composite; split backend (CE-E14a) then frontend (CE-E14b).
+
+## Changes
+
+- `app/schemas/national_scores.py` (new) — `NationalDimensionScoresResponse` = `{ period, aggregation, count, states: [{ state_fips, primary_care, dental, mental_health, mua_p }] }`; each dimension entry `{ dimension_id, available, median, county_count, available_county_count }`.
+- `app/services/national_scores.py` (new) — `load_national_dimension_scores`: one read-only `SELECT` over `county` / `county_period` / `dimension_score`, then `statistics.median` per (state, dimension) over non-NULL persisted scores. NULLs excluded; no available county → `median = null` / `available = false`; all 51 states, ordered by `state_fips`. No analytical recomputation, no writes.
+- `app/api/v1/national_scores.py` (new) — `GET /api/v1/states/dimension-scores`; own `get_national_scores_connection` dependency (open failure → 503), CE-E09 pattern. The literal two-segment path does not collide with CE-E09's three-segment `/states/{state_fips}/dimension-scores`.
+- `app/api/v1/__init__.py` — registers `national_scores_router` before `state_scores_router`.
+- `Documentation/NATIONAL_MAP_STATE_SUMMARY.md.txt` (new) — the authoritative aggregation rule, why median (vs mean / population-weighting), and its display-only / not-a-methodology-change status.
+
+## Constraints honoured
+
+No DB / schema / migration / seed change. No analytical table, script, or calculation touched. No frontend change. `Data/Model/chia_v01.sqlite` SHA-256 `12b3525e77cdc85ba7fedbb463fcc75f21c489825c0e81d98cdf71a2b7c7174c` unchanged; the six existing `EXPECTED_PRODUCTION_SHA256` anchors unchanged. `county_period.period` and `methodology.methodology_version` remain `v0.1`.
+
+## Tests / validation
+
+New `tests/test_ce_e14_national_dimension_scores.py` (10 tests): median for odd / even / singleton / partial-NULL states; all-NULL and no-`county_period` states → null; MUA/P medianed on its own values; all 51 states in ascending order; 200 shape; no route collision with CE-E09; structurally-unusable DB → 503; read-only digest unchanged; guarded production test cross-checks every state×dimension median against a direct `statistics.median` read and asserts the canonical SHA-256 unchanged. Full gate: backend `unittest discover` 163/163; the five v0.1 analytical validators + `validate_v02_geographic_join` PASSED; frontend `vitest` 244/244, `eslint` clean, `tsc && vite build` clean.
+
+## Status
+
+**CE-E14a implemented; full gate green; pending review, then commit/tag authorization.** CE-E14b (frontend national-map measure view reusing `fillForScore` / `ChoroplethLegend` / `DimensionSelector`) not started. Not committed, not pushed. Rule: `Documentation/NATIONAL_MAP_STATE_SUMMARY.md.txt`.
+
+---
+
 *This log serves as the historical record of significant project decisions, milestones, and direction. It documents not only what changed, but why those decisions were made.*
