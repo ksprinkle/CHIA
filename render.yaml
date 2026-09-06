@@ -1,0 +1,29 @@
+# Render Blueprint for the CHIA County Explorer API (CE-DEP01).
+#
+# Deploys the read-only FastAPI backend defined in app/main.py. The canonical
+# database (Data/Model/chia_v01.sqlite) is versioned in this repository and is
+# therefore present in the build; it is opened mode=ro and never written, so no
+# persistent disk is required.
+#
+# Python version is pinned by runtime.txt (python-3.11.9).
+
+services:
+  - type: web
+    name: chia-county-explorer-api
+    runtime: python
+    plan: free
+    rootDir: .
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      # Comma-separated exact scheme://host origins allowed to read the API
+      # from a browser. Leave unset to keep cross-origin access disabled.
+      # Expected value once the frontend is deployed: https://ksprinkle.github.io
+      - key: CHIA_ALLOWED_ORIGINS
+        sync: false
+      # Optional: override the database location. Defaults to the versioned
+      # copy at Data/Model/chia_v01.sqlite.
+      - key: CHIA_DATABASE_PATH
+        sync: false

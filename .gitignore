@@ -7,6 +7,13 @@ __pycache__/
 *.sqlite3
 *.db
 
+# Exception (CE-DEP01): the canonical, validated CHIA v0.1 database is a
+# versioned, read-only build artifact the deployed API requires at runtime
+# (opened mode=ro; never written). Its content is anchored by the SHA-256
+# 12b3525e77cdc85ba7fedbb463fcc75f21c489825c0e81d98cdf71a2b7c7174c in the
+# test suite, so drift is caught.
+!Data/Model/chia_v01.sqlite
+
 # Raw source data
 Data/Raw/
 
