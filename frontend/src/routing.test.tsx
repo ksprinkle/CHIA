@@ -1,5 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 
+import { router as appRouter, routes } from './router'
 import {
   makeCounties,
   makeExplorer,
@@ -236,5 +237,23 @@ describe('CE-E03 state county map & county navigation', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: /county 01001/i }),
     ).toBeInTheDocument()
+  })
+})
+
+describe('CE-DEP02 deployment base path', () => {
+  it('serves the real browser router under import.meta.env.BASE_URL', () => {
+    // vite.config.ts `base` -> `/CHIA/` in this suite and the deployed build.
+    expect(import.meta.env.BASE_URL).toBe('/CHIA/')
+    expect(appRouter.basename).toBe('/CHIA/')
+  })
+
+  it('keeps route paths basename-relative (unchanged) so deep links resolve under the base', () => {
+    const paths = routes.map((route) => route.path)
+    expect(paths).toEqual(['/', '/states/:stateFips', '/counties/:countyFips', '*'])
+    // The real router combines basename + these: /CHIA/, /CHIA/states/:fips,
+    // /CHIA/counties/:fips.
+    expect(appRouter.routes.some((route) => route.path === '/states/:stateFips')).toBe(
+      true,
+    )
   })
 })

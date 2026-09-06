@@ -31,4 +31,11 @@ export const routes: RouteObject[] = [
   },
 ]
 
-export const router = createBrowserRouter(routes)
+// CE-DEP02: the deployed app is served from a sub-path (GitHub Pages
+// `/CHIA/`), which `vite.config.ts` `base` feeds into `import.meta.env.BASE_URL`.
+// Route paths in `routes` stay basename-relative and unchanged; the browser
+// URLs become `/CHIA/`, `/CHIA/states/:fips`, `/CHIA/counties/:fips`. Tests
+// that need basename-free paths build their own `createMemoryRouter(routes)`.
+export const router = createBrowserRouter(routes, {
+  basename: import.meta.env.BASE_URL,
+})

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 
 import { UsStateMap } from './UsStateMap'
@@ -6,7 +6,12 @@ import { MISSING_FILL, fillForScore } from '../lib/choropleth'
 import { DIMENSIONS } from '../lib/dimensions'
 import type { DimensionMeta } from '../lib/dimensions'
 import type { StateSummary } from '../lib/states'
-import { makeMultiStateCounties, renderApp, stubCountiesFetch } from '../test/harness'
+import {
+  STUB_US_STATES_TOPOJSON,
+  makeMultiStateCounties,
+  renderApp,
+  stubCountiesFetch,
+} from '../test/harness'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -215,5 +220,40 @@ describe('UsStateMap (CE-E14b analytical colouring)', () => {
 
     fireEvent.click(california)
     expect(run.router.state.location.pathname).toBe('/states/06')
+  })
+})
+
+describe('UsStateMap (CE-DEP02 deployment base path)', () => {
+  it('requests the national TopoJSON under import.meta.env.BASE_URL', async () => {
+    const requested: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: unknown) => {
+        requested.push(String(input))
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => STUB_US_STATES_TOPOJSON,
+        } as Response)
+      }),
+    )
+
+    const router = createMemoryRouter(
+      [{ path: '/', element: <UsStateMap states={TWO_STATES} /> }],
+      { initialEntries: ['/'] },
+    )
+    render(<RouterProvider router={router} />)
+
+    await waitFor(() =>
+      expect(requested).toContain(
+        `${import.meta.env.BASE_URL}geo/us-states.topojson`,
+      ),
+    )
+    // The suite runs under base `/CHIA/` (vite.config.ts): a deployment-aware,
+    // not a bare root-relative, path.
+    expect(`${import.meta.env.BASE_URL}geo/us-states.topojson`).toBe(
+      '/CHIA/geo/us-states.topojson',
+    )
+    expect(requested).not.toContain('/geo/us-states.topojson')
   })
 })

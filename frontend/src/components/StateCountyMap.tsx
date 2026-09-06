@@ -9,7 +9,10 @@ const MAP_WIDTH = 800
 const MAP_HEIGHT = 600
 
 function countyGeographyUrl(stateFips: string): string {
-  return `/geo/counties/${stateFips}.topojson`
+  // CE-E01 committed asset. CE-DEP02: `import.meta.env.BASE_URL` (always
+  // trailing-slashed) prefixes it so it resolves under the deployment base,
+  // e.g. `/CHIA/geo/counties/06.topojson`.
+  return `${import.meta.env.BASE_URL}geo/counties/${stateFips}.topojson`
 }
 
 export interface StateCountyMapProps {

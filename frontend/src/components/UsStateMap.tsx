@@ -5,8 +5,12 @@ import { fillForScore, formatScoreValue } from '../lib/choropleth'
 import type { DimensionMeta } from '../lib/dimensions'
 import type { StateSummary } from '../lib/states'
 
-/** CE-E01 committed geographic asset -- not regenerated or modified here. */
-const US_STATES_GEOGRAPHY_URL = '/geo/us-states.topojson'
+/**
+ * CE-E01 committed geographic asset -- not regenerated or modified here.
+ * CE-DEP02: prefixed with `import.meta.env.BASE_URL` (always trailing-slashed)
+ * so it resolves under the deployment base, e.g. `/CHIA/geo/us-states.topojson`.
+ */
+const US_STATES_GEOGRAPHY_URL = `${import.meta.env.BASE_URL}geo/us-states.topojson`
 
 export interface UsStateMapProps {
   states: StateSummary[]

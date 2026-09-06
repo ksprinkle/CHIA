@@ -1,7 +1,10 @@
-import { fireEvent, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 
+import { StateCountyMap } from './StateCountyMap'
 import { MISSING_FILL } from '../lib/choropleth'
 import {
+  STUB_STATE_COUNTIES_TOPOJSON,
   makeMultiStateCounties,
   makeStateScores,
   renderApp,
@@ -194,5 +197,41 @@ describe('StateCountyMap (CE-E10 analytical choropleth)', () => {
     const autauga = await findCountyButton(/select autauga county/i)
     expect(autauga.style.fill).toBe('')
     expect(autauga.querySelector('title')?.textContent).toBe('Autauga County')
+  })
+})
+
+describe('StateCountyMap (CE-DEP02 deployment base path)', () => {
+  it('requests the per-state county TopoJSON under import.meta.env.BASE_URL', async () => {
+    const requested: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: unknown) => {
+        requested.push(String(input))
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => STUB_STATE_COUNTIES_TOPOJSON['01'],
+        } as Response)
+      }),
+    )
+
+    const counties = makeMultiStateCounties().counties.filter(
+      (county) => county.state_fips === '01',
+    )
+    const router = createMemoryRouter(
+      [{ path: '/', element: <StateCountyMap stateFips="01" counties={counties} /> }],
+      { initialEntries: ['/'] },
+    )
+    render(<RouterProvider router={router} />)
+
+    await waitFor(() =>
+      expect(requested).toContain(
+        `${import.meta.env.BASE_URL}geo/counties/01.topojson`,
+      ),
+    )
+    expect(`${import.meta.env.BASE_URL}geo/counties/01.topojson`).toBe(
+      '/CHIA/geo/counties/01.topojson',
+    )
+    expect(requested).not.toContain('/geo/counties/01.topojson')
   })
 })
