@@ -879,6 +879,77 @@ code {
   background: var(--color-surface);
 }
 
+/* CE-E14b national-map measure view */
+.home__map-mode {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin: var(--space-4) 0 var(--space-2);
+}
+
+.home__map-mode-enter,
+.home__map-mode-exit {
+  font: inherit;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: inherit;
+  cursor: pointer;
+}
+
+.home__map-mode-enter:hover,
+.home__map-mode-exit:hover {
+  background: var(--color-surface);
+}
+
+.home__scores-status {
+  color: var(--color-muted);
+  margin: var(--space-2) 0;
+}
+
+.national-map-note {
+  max-width: 32rem;
+  margin: var(--space-2) 0;
+  color: var(--color-muted);
+  font-size: 0.9375rem;
+}
+
+.national-state-score-table {
+  margin: var(--space-3) 0;
+}
+
+.national-state-score-table__summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.national-state-score-table table {
+  border-collapse: collapse;
+  margin-top: var(--space-2);
+  width: 100%;
+  max-width: 36rem;
+  font-size: 0.9375rem;
+}
+
+.national-state-score-table caption {
+  text-align: left;
+  color: var(--color-muted);
+  margin-bottom: var(--space-1);
+}
+
+.national-state-score-table th,
+.national-state-score-table td {
+  border: 1px solid var(--color-border);
+  padding: var(--space-1) var(--space-2);
+  text-align: left;
+}
+
+.national-state-score-table thead th {
+  background: var(--color-surface);
+}
+
 @media (max-width: 600px) {
   .app-main {
     padding: var(--space-4) var(--space-2);

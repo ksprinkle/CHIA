@@ -1,11 +1,38 @@
-import { fireEvent, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
+import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 
+import { UsStateMap } from './UsStateMap'
+import { MISSING_FILL, fillForScore } from '../lib/choropleth'
+import { DIMENSIONS } from '../lib/dimensions'
+import type { DimensionMeta } from '../lib/dimensions'
+import type { StateSummary } from '../lib/states'
 import { makeMultiStateCounties, renderApp, stubCountiesFetch } from '../test/harness'
 
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
+
+const TWO_STATES: StateSummary[] = [
+  { state_fips: '01', state_abbr: 'AL', state_name: 'Alabama' },
+  { state_fips: '06', state_abbr: 'CA', state_name: 'California' },
+]
+
+const PERCENTILE_DIM = DIMENSIONS.find((d) => d.key === 'primary_care') as DimensionMeta
+const COVERAGE_DIM = DIMENSIONS.find((d) => d.key === 'mua_p') as DimensionMeta
+
+/** Render UsStateMap in isolation with a router so navigation is observable. */
+function renderMap(props: Partial<Parameters<typeof UsStateMap>[0]> = {}) {
+  stubCountiesFetch(makeMultiStateCounties()) // resolves /geo/us-states.topojson
+  const router = createMemoryRouter(
+    [
+      { path: '/', element: <UsStateMap states={TWO_STATES} {...props} /> },
+      { path: '/states/:stateFips', element: <div>state route</div> },
+    ],
+    { initialEntries: ['/'] },
+  )
+  return { router, ...render(<RouterProvider router={router} />) }
+}
 
 describe('UsStateMap (CE-E02)', () => {
   it('renders the map with one selectable feature per supported state', async () => {
@@ -92,5 +119,101 @@ describe('UsStateMap (CE-E02)', () => {
     renderApp(['/'])
 
     expect(screen.queryByRole('group', { name: /map of the united states/i })).toBeNull()
+  })
+})
+
+describe('UsStateMap (CE-E14b analytical colouring)', () => {
+  async function findStateButtons() {
+    const map = await screen.findByRole('group', { name: /map of the united states/i })
+    return {
+      alabama: await within(map).findByRole('button', { name: /select alabama/i }),
+      california: within(map).getByRole('button', { name: /select california/i }),
+    }
+  }
+
+  it('renders neutral (no inline fill, name-only title) when medians are not supplied', async () => {
+    renderMap()
+    const { alabama } = await findStateButtons()
+
+    expect(alabama.style.fill).toBe('')
+    expect(alabama.querySelector('title')?.textContent).toBe('Alabama')
+  })
+
+  it('fills each state from lib/choropleth.ts by its median on the active dimension', async () => {
+    renderMap({
+      medians: new Map([
+        ['01', 25],
+        ['06', 75],
+      ]),
+      activeDimension: PERCENTILE_DIM,
+    })
+    const { alabama, california } = await findStateButtons()
+
+    expect(alabama.style.fill).toBe(fillForScore(25, 'percentile'))
+    expect(california.style.fill).toBe(fillForScore(75, 'percentile'))
+    expect(alabama.style.fill).not.toBe(california.style.fill)
+
+    // Value shown in the hover title; aria-label unchanged (CE-E10.1).
+    expect(alabama.querySelector('title')?.textContent).toBe('Alabama — 25 percentile')
+    expect(alabama).toHaveAttribute('aria-label', 'Select Alabama')
+    expect(alabama).not.toHaveAttribute('title')
+  })
+
+  it('uses MISSING_FILL and a "no data" title for a null median or a state with no entry', async () => {
+    renderMap({
+      medians: new Map<string, number | null>([['01', null]]), // 06 absent entirely
+      activeDimension: PERCENTILE_DIM,
+    })
+    const { alabama, california } = await findStateButtons()
+
+    for (const feature of [alabama, california]) {
+      expect(feature.style.fill.toLowerCase()).toBe(MISSING_FILL.toLowerCase())
+      expect(feature.querySelector('title')?.textContent).toMatch(/ — no data$/)
+    }
+  })
+
+  it('keeps MUA/P on its own coverage scale, not the percentile ramp', async () => {
+    renderMap({
+      medians: new Map([['01', 80]]),
+      activeDimension: COVERAGE_DIM,
+    })
+    const { alabama } = await findStateButtons()
+
+    expect(alabama.style.fill).toBe(fillForScore(80, 'coverage'))
+    expect(alabama.style.fill).not.toBe(fillForScore(80, 'percentile'))
+    expect(alabama.querySelector('title')?.textContent).toBe('Alabama — 80% coverage')
+  })
+
+  it('still navigates on Space with medians present', async () => {
+    const run = renderMap({
+      medians: new Map([['01', 25]]),
+      activeDimension: PERCENTILE_DIM,
+    })
+    const { alabama } = await findStateButtons()
+
+    fireEvent.keyDown(alabama, { key: ' ' })
+    expect(run.router.state.location.pathname).toBe('/states/01')
+  })
+
+  it('still navigates on Enter with medians present', async () => {
+    const run = renderMap({
+      medians: new Map([['01', 25]]),
+      activeDimension: PERCENTILE_DIM,
+    })
+    const { alabama } = await findStateButtons()
+
+    fireEvent.keyDown(alabama, { key: 'Enter' })
+    expect(run.router.state.location.pathname).toBe('/states/01')
+  })
+
+  it('still navigates on click with medians present', async () => {
+    const run = renderMap({
+      medians: new Map([['06', 75]]),
+      activeDimension: PERCENTILE_DIM,
+    })
+    const { california } = await findStateButtons()
+
+    fireEvent.click(california)
+    expect(run.router.state.location.pathname).toBe('/states/06')
   })
 })

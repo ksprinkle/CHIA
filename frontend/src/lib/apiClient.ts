@@ -9,6 +9,7 @@ import { API_BASE_URL } from './config'
 import type {
   CountyListResponse,
   ExplorerResponse,
+  NationalDimensionScoresResponse,
   StateDimensionScoresResponse,
 } from './types'
 
@@ -88,4 +89,15 @@ export function getStateDimensionScores(
     `/states/${encodeURIComponent(stateFips)}/dimension-scores`,
     signal,
   )
+}
+
+/**
+ * GET /api/v1/states/dimension-scores -- for every state, a display-only
+ * median of that state's counties' persisted v0.1 access-dimension scores
+ * (CE-E14a). Read-only; the frontend never recomputes a value.
+ */
+export function getNationalDimensionScores(
+  signal?: AbortSignal,
+): Promise<NationalDimensionScoresResponse> {
+  return getJson<NationalDimensionScoresResponse>('/states/dimension-scores', signal)
 }

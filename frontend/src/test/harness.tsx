@@ -10,6 +10,8 @@ import type {
   DimensionProfile,
   DimensionScoreEntry,
   ExplorerResponse,
+  NationalDimensionScoresResponse,
+  StateDimensionMedian,
   StateDimensionScoresResponse,
 } from '../lib/types'
 
@@ -167,6 +169,11 @@ function stateScoresFipsFromUrl(url: string): string | null {
   return url.match(/\/states\/(\d{2})\/dimension-scores/)?.[1] ?? null
 }
 
+/** CE-E14a: the national per-state summary endpoint (no FIPS segment). */
+function isNationalScoresRequest(url: string): boolean {
+  return /\/states\/dimension-scores(\?|$)/.test(url)
+}
+
 /**
  * Default CE-E09 response for a state, synthesized from an already-stubbed
  * county list so the ~30 existing `/states/:fips` tests that do not care about
@@ -206,6 +213,7 @@ export function stubCountiesFetch(payload: CountyListResponse | Error | FetchImp
     impl = (...args: unknown[]) => {
       const url = String(args[0])
       if (isGeographyRequest(url)) return geographyResponseFor(url)
+      if (isNationalScoresRequest(url)) return okJson(makeNationalScores())
       if (stateScoresFipsFromUrl(url) !== null) {
         return defaultStateScoresResponse(url, payload.counties)
       }
@@ -230,6 +238,12 @@ interface ApiStub {
   stateScores?: (
     stateFips: string,
   ) => StateDimensionScoresResponse | Error | number
+  /**
+   * CE-E14a `/states/dimension-scores` (national per-state medians). Return a
+   * response, an Error to throw, or an HTTP status number. Omit for the
+   * default {@link makeNationalScores} fixture.
+   */
+  nationalScores?: () => NationalDimensionScoresResponse | Error | number
 }
 
 /** Stub the global `fetch` for the CHIA API endpoints, routed by URL. */
@@ -237,6 +251,13 @@ export function stubApi(stub: ApiStub = {}) {
   const impl: FetchImpl = (...args: unknown[]) => {
     const url = String(args[0])
     if (isGeographyRequest(url)) return geographyResponseFor(url)
+
+    if (isNationalScoresRequest(url)) {
+      const result = stub.nationalScores ? stub.nationalScores() : makeNationalScores()
+      if (typeof result === 'number') return errStatus(result)
+      if (result instanceof Error) throw result
+      return okJson(result)
+    }
 
     const stateScoresFips = stateScoresFipsFromUrl(url)
     if (stateScoresFips !== null) {
@@ -346,6 +367,78 @@ export function makeStateScores(
     period: 'v0.1',
     count: rows.length,
     counties: rows,
+  }
+}
+
+const NATIONAL_DIMENSION_IDS: Record<keyof AccessProfile, string> = {
+  primary_care: 'PRIMARY_CARE',
+  dental: 'DENTAL',
+  mental_health: 'MENTAL_HEALTH',
+  mua_p: 'MUA_P',
+}
+
+/** Deterministic CE-E14a fixture: the two states in {@link makeMultiStateCounties}
+ *  (`01` with 2 counties, `06` with 1), each with a fixed per-dimension median.
+ *  `overrides[state_fips][dimensionKey]` patches one entry (e.g. `{ available:
+ *  false }` -> median null / available_county_count 0). */
+export function makeNationalScores(
+  overrides: Record<
+    string,
+    Partial<Record<keyof AccessProfile, Partial<StateDimensionMedian>>>
+  > = {},
+): NationalDimensionScoresResponse {
+  const defaults: Record<
+    string,
+    { countyCount: number; availableCount: number; medians: Record<keyof AccessProfile, number> }
+  > = {
+    '01': {
+      countyCount: 2,
+      availableCount: 2,
+      medians: { primary_care: 25, dental: 0, mental_health: 50, mua_p: 80 },
+    },
+    '06': {
+      countyCount: 1,
+      availableCount: 1,
+      medians: { primary_care: 75, dental: 10, mental_health: 90, mua_p: 40 },
+    },
+  }
+
+  const states = Object.keys(defaults)
+    .sort()
+    .map((stateFips) => {
+      const base = defaults[stateFips]
+      const entryFor = (key: keyof AccessProfile): StateDimensionMedian => {
+        const entry: StateDimensionMedian = {
+          dimension_id: NATIONAL_DIMENSION_IDS[key],
+          available: true,
+          median: base.medians[key],
+          county_count: base.countyCount,
+          available_county_count: base.availableCount,
+        }
+        const patch = overrides[stateFips]?.[key]
+        if (!patch) return entry
+        const merged = { ...entry, ...patch }
+        if (merged.available === false) {
+          return { ...merged, median: null, available_county_count: 0 }
+        }
+        return merged
+      }
+      return {
+        state_fips: stateFips,
+        primary_care: entryFor('primary_care'),
+        dental: entryFor('dental'),
+        mental_health: entryFor('mental_health'),
+        mua_p: entryFor('mua_p'),
+      }
+    })
+
+  return {
+    period: 'v0.1',
+    aggregation:
+      "Per state, per dimension: the median of that state's counties' persisted " +
+      'v0.1 dimension_score.score. Display-only; not a validated state score.',
+    count: states.length,
+    states,
   }
 }
 

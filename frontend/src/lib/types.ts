@@ -162,3 +162,39 @@ export interface StateDimensionScoresResponse {
   count: number
   counties: CountyDimensionScores[]
 }
+
+/**
+ * CE-E14a / CE-E14b national (per-state) dimension-score summary contract.
+ *
+ * Mirrors `app/schemas/national_scores.py`
+ * (`NationalDimensionScoresResponse`): for every state, a **display-only**
+ * median of that state's counties' persisted v0.1 access-dimension scores.
+ * `median` is not a CHIA state-level score; nothing is computed client-side.
+ * See `Documentation/NATIONAL_MAP_STATE_SUMMARY.md.txt`.
+ */
+export interface StateDimensionMedian {
+  dimension_id: string
+  available: boolean
+  /** Median of the state's counties' persisted scores for this dimension;
+   *  null when no county in the state has an available score. */
+  median: number | null
+  county_count: number
+  available_county_count: number
+}
+
+export interface StateDimensionMedians {
+  state_fips: string
+  primary_care: StateDimensionMedian
+  dental: StateDimensionMedian
+  mental_health: StateDimensionMedian
+  mua_p: StateDimensionMedian
+}
+
+/** Envelope for GET /api/v1/states/dimension-scores. */
+export interface NationalDimensionScoresResponse {
+  period: string
+  /** Human-readable statement of the display-only aggregation rule. */
+  aggregation: string
+  count: number
+  states: StateDimensionMedians[]
+}

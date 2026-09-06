@@ -3,6 +3,7 @@ import {
   ApiError,
   NotFoundError,
   getCountyExplorer,
+  getNationalDimensionScores,
   getStateDimensionScores,
   listCounties,
 } from './apiClient'
@@ -103,6 +104,17 @@ describe('apiClient (read-only)', () => {
     )
   })
 
+  it('getNationalDimensionScores() targets the national per-state dimension-scores path', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({}))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await getNationalDimensionScores()
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      `${API_BASE_URL}/states/dimension-scores`,
+    )
+  })
+
   it('exports only fetch wrappers -- no county list or analytical helpers', async () => {
     const module = await import('./apiClient')
     expect(Object.keys(module).sort()).toEqual(
@@ -110,6 +122,7 @@ describe('apiClient (read-only)', () => {
         'ApiError',
         'NotFoundError',
         'getCountyExplorer',
+        'getNationalDimensionScores',
         'getStateDimensionScores',
         'listCounties',
       ].sort(),
